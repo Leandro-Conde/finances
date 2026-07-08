@@ -1,0 +1,33 @@
+.home{
+
+    display:grid;
+
+    grid-template-columns:360px 1fr;
+
+    gap:25px;
+
+    padding:25px;
+
+}
+
+.left-panel{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:20px;
+
+}
+
+.right-panel{
+
+    background:#16181d;
+
+    border:1px solid #27272a;
+
+    border-radius:20px;
+
+    padding:20px;
+
+}

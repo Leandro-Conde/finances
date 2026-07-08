@@ -1,0 +1,3 @@
+<Charts
+    transactions={transactions}
+/>

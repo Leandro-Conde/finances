@@ -1,0 +1,31 @@
+.dashboard{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:18px;
+
+}
+
+.saldo-card{
+
+    background:#18181b;
+
+    border:1px solid #27272a;
+
+    border-radius:18px;
+
+    padding:25px;
+
+}
+
+.metrics-grid{
+
+    display:grid;
+
+    grid-template-columns:1fr 1fr;
+
+    gap:15px;
+
+}

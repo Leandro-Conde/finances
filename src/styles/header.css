@@ -1,0 +1,57 @@
+.header{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    padding:18px 32px;
+
+}
+
+.header > h1 {
+    align-items: center;
+}
+
+.header-actions{
+
+    display:flex;
+
+    align-items:center;
+
+}
+
+.logout-button{
+
+    background:#7c3aed;
+
+    color:#fff;
+
+    border:none;
+
+    padding:6px 12px;
+
+    border-radius:8px;
+
+    font-size:0.82rem;
+
+    font-weight:500;
+
+    cursor:pointer;
+
+    opacity:.75;
+
+    transition:.25s;
+
+}
+
+.logout-button:hover{
+
+    opacity:1;
+
+    transform:translateY(-1px);
+
+    box-shadow:0 0 12px rgba(124,58,237,.35);
+
+}
