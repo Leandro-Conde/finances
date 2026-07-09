@@ -21,6 +21,7 @@ function App() {
   const [showFilters, setShowFilters] = useState(false);
   const [filtro, setFiltro] = useState("Todos");
   const [user,setUser]=useState(null);
+  const [loadingAuth, setLoadingAuth] = useState(true);
 
   async function loadTransactions() {
 
@@ -44,28 +45,33 @@ function App() {
   useEffect(() => {
 
     supabase.auth.getSession().then(({ data }) => {
-  
-      setUser(data.session?.user ?? null);
-  
+
+        setUser(data.session?.user ?? null);
+        setLoadingAuth(false);
+
     });
-  
-    const { data: listener } =
-      supabase.auth.onAuthStateChange((event, session) => {
-  
+
+    const {
+
+        data: listener,
+
+    } = supabase.auth.onAuthStateChange((event, session) => {
+
         setUser(session?.user ?? null);
-  
-      });
-  
-    return () => {
-  
-      listener.subscription.unsubscribe();
-  
-    };
-  
-  }, []);
+
+    });
+
+    return () => listener.subscription.unsubscribe();
+
+}, []);
 
   useEffect(() => {
 
+    if (loadingAuth) {
+
+      return <h2>Carregando...</h2>;
+  
+  }
     if (user) {
   
       loadTransactions();
