@@ -1,10 +1,12 @@
+import { useState } from "react";
 import CurrencyInput from "react-currency-input-field";
 
 function WizardStepInfo({
     formData,
     setFormData,
+    categories,
+    addCategory,
 }) {
-
     const categorias = {
 
         entrada: [
@@ -44,7 +46,20 @@ function WizardStepInfo({
 
     };
 
-    const lista = categorias[formData.tipo] || [];
+    const [novaCategoria, setNovaCategoria] = useState("");
+
+    const categoriasPadrao = categorias[formData.tipo] || [];
+
+    const categoriasUsuario = categories.filter(
+        (c) => c.tipo === formData.tipo
+    );
+    
+    const listaFinal = [
+        ...categoriasPadrao,
+        ...categoriasUsuario.map((c) => c.nome),
+    ];
+
+    
 
     return (
 
@@ -86,7 +101,7 @@ function WizardStepInfo({
 
                 </option>
 
-                {lista.map((categoria) => (
+                {listaFinal.map((categoria) => (
 
                     <option
 
@@ -103,6 +118,50 @@ function WizardStepInfo({
                 ))}
 
             </select>
+
+            <div className="new-category">
+
+    <input
+
+        placeholder="Nova categoria"
+
+        value={novaCategoria}
+
+        onChange={(e)=>setNovaCategoria(e.target.value)}
+
+    />
+
+    <button
+
+        type="button"
+
+        onClick={async()=>{
+
+            if(!novaCategoria.trim()) return;
+
+            await addCategory(novaCategoria, formData.tipo);
+
+            setFormData((prev) => ({
+            
+                ...prev,
+            
+                categoria: novaCategoria,
+            
+            }));
+            
+            setNovaCategoria("");
+
+            setNovaCategoria("");
+
+        }}
+
+    >
+
+        Adicionar
+
+    </button>
+
+</div>
 
             <input
 

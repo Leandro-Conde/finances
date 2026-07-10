@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import WizardStepType from "./WizardStepType";
 import WizardStepInfo from "./WizardStepInfo";
@@ -6,6 +6,16 @@ import WizardStepReview from "./WizardStepReview";
 
 import { supabase } from "../../services/supabase";
 import { parseCurrency } from "../../utils/parseCurrency";
+
+import {
+
+  getCategories,
+
+  createCategory,
+
+  /*deleteCategory,*/
+
+} from "../../services/categoryService";
 
 function ModalWizard({
   user,
@@ -24,6 +34,7 @@ function ModalWizard({
     data: "",
     observacao: "",
   });
+  const [categories, setCategories] = useState([]);
 
   const [pendingTransactions, setPendingTransactions] = useState([]);
 
@@ -61,6 +72,55 @@ function ModalWizard({
     setStep(1);
 
   }
+
+  useEffect(() => {
+
+    
+
+    if (!user) return;
+
+    loadCategories();
+
+}, [user]);
+
+async function loadCategories() {
+
+  try {
+
+      const data = await getCategories(user.id);
+
+      setCategories(data);
+
+  } catch (err) {
+
+      console.error(err);
+
+  }
+
+}
+
+async function addCategory(nome, tipo) {
+
+  try {
+
+      await createCategory({
+
+          nome,
+          tipo,
+          prioridade: false,
+          user_id: user.id,
+
+      });
+
+      await loadCategories();
+
+  } catch (err) {
+
+      console.error(err);
+
+  }
+
+}
 
   async function confirmarTudo() {
 
@@ -127,6 +187,8 @@ function ModalWizard({
 
   }
 
+  console.log("Categorias do Modal:", categories);
+
   return (
 
     <div>
@@ -147,10 +209,12 @@ function ModalWizard({
 
       {step === 2 && (
 
-        <WizardStepInfo
-          formData={formData}
-          setFormData={setFormData}
-        />
+      <WizardStepInfo
+      formData={formData}
+      setFormData={setFormData}
+      categories={categories}
+      addCategory={addCategory}
+      />
 
       )}
 

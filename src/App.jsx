@@ -67,11 +67,6 @@ function App() {
 
   useEffect(() => {
 
-    if (loadingAuth) {
-
-      return <h2>Carregando...</h2>;
-  
-  }
     if (user) {
   
       loadTransactions();
@@ -123,6 +118,12 @@ function App() {
 
           return <Login />;
         
+        }
+
+        if (loadingAuth) {
+
+          return <h2>Carregando...</h2>;
+    
         }
 
   return (
