@@ -79,7 +79,7 @@ function WizardStepInfo({
 
             <select
 
-                value={formData.categoria}
+               defaultValue=""
 
                 onChange={(e) =>
 

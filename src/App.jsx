@@ -114,17 +114,19 @@ function App() {
 
         });
 
+        if (loadingAuth) {
+
+          return <h2>Carregando...</h2>;
+
+        }
+
         if (!user) {
 
           return <Login />;
         
         }
 
-        if (loadingAuth) {
-
-          return <h2>Carregando...</h2>;
-    
-        }
+        
 
   return (
     <>
