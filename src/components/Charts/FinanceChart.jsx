@@ -55,27 +55,23 @@ import {
               tickLine={false}
           />
   
-            <YAxis
-              axisLine={false}
-              tickLine={false}
-          />
+        <YAxis
+          axisLine={false}
+          tickLine={false}
+          tickFormatter={(value) => formatCurrency(value)}
+      />
             <Tooltip
-
               contentStyle={{
-
-              background:"#18181B",
-
-              border:"1px solid #333",
-
-              borderRadius:"12px",
-
-              color:"#fff",
-
+                  background: "#18181B",
+                  border: "1px solid #333",
+                  borderRadius: "12px",
+                  color: "#fff",
               }}
-
-              formatter={(value)=>formatCurrency(value)}
-
-              />
+              formatter={(value) => formatCurrency(value)}
+              labelStyle={{
+                  color: "#fff",
+              }}
+          />
   
               <Legend
             iconType="circle"

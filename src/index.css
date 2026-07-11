@@ -165,3 +165,89 @@ button {
   transition:.5s;
 
 }
+
+/* ===================================== */
+/* BOTÕES */
+/* ===================================== */
+
+button{
+
+  cursor:pointer;
+
+  transition:
+      transform .18s ease,
+      box-shadow .18s ease,
+      background-color .18s ease,
+      border-color .18s ease;
+
+}
+
+button:hover{
+
+  transform:translateY(-2px);
+
+}
+
+button:active{
+
+  transform:scale(.97);
+
+}
+
+.new-transaction-btn{
+
+  background:#7c3aed;
+
+  color:white;
+
+  border:none;
+
+  border-radius:12px;
+
+  padding:12px 22px;
+
+  font-weight:600;
+
+  transition:
+      transform .18s,
+      box-shadow .18s,
+      background .18s;
+
+}
+
+.new-transaction-btn:hover{
+
+  background:#8b5cf6;
+
+  box-shadow:
+
+      0 10px 22px rgba(124,58,237,.35);
+
+     
+}
+
+.new-transaction-btn:active{
+
+  transform:scale(.96);
+
+}
+
+.wizard-buttons button{
+
+  min-width:120px;
+
+  transition:.18s;
+
+}
+
+.wizard-buttons button:hover{
+
+  transform:translateY(-2px);
+
+}
+
+.wizard-buttons button:active{
+
+  transform:scale(.96);
+
+}

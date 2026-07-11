@@ -1,43 +1,85 @@
 import "../../styles/cards.css";
 
-
 function MetricCard({
 
-  titulo,
-  valor,
-  children,
+    titulo,
+    valor,
+    children,
+    delay = 0,
 
-}){
+}) {
 
-  return(
+    function getClass(){
 
-      <div className="metric-card">
+        switch(titulo){
 
-          <h4>{titulo}</h4>
+            case "Saldo Atual":
+                return "saldo";
 
-          <h2>
+            case "Entradas":
+                return "entrada";
 
-              {valor.toLocaleString(
+            case "Saídas":
+                return "saida";
 
-                  "pt-BR",
+            case "Investimentos":
+                return "investimento";
 
-                  {
+            case "Renda Passiva":
+                return "passiva";
 
-                      style:"currency",
+            case "Economia":
+                return "economia";
 
-                      currency:"BRL"
+            case "Teto de Gastos":
+                return "gastos";
 
-                  }
+            default:
+                return "";
 
-              )}
+        }
 
-          </h2>
+    }
 
-          {children}
+    return(
 
-      </div>
+        <div
 
-  );
+            className={`metric-card ${getClass()}`}
+
+            style={{
+
+                animationDelay:`${delay}ms`
+
+            }}
+
+        >
+
+            <h4>{titulo}</h4>
+
+            <h2>
+
+                {valor.toLocaleString(
+
+                    "pt-BR",
+
+                    {
+
+                        style:"currency",
+
+                        currency:"BRL"
+
+                    }
+
+                )}
+
+            </h2>
+
+            {children}
+
+        </div>
+
+    );
 
 }
 

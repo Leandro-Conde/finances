@@ -139,3 +139,161 @@ transform:translateY(0);
         border-radius:20px;
         
         }
+
+        /*==================================*/
+/* GLOW DOS CARDS */
+/*==================================*/
+
+.metric-card{
+
+    position:relative;
+
+    overflow:hidden;
+
+}
+
+.metric-card::before{
+
+    content:"";
+
+    position:absolute;
+
+    inset:-35%;
+
+    opacity:.18;
+
+    filter:blur(45px);
+
+    transition:.35s;
+
+    z-index:0;
+
+}
+
+.metric-card>*{
+
+    position:relative;
+
+    z-index:1;
+
+}
+
+.metric-card.entrada::before{
+
+    background:
+
+    radial-gradient(
+
+        circle,
+
+        #22c55e,
+
+        transparent 70%
+
+    );
+
+}
+
+.metric-card.saida::before{
+
+    background:
+
+    radial-gradient(
+
+        circle,
+
+        #ef4444,
+
+        transparent 70%
+
+    );
+
+}
+
+.metric-card.investimento::before{
+
+    background:
+
+    radial-gradient(
+
+        circle,
+
+        #facc15,
+
+        transparent 70%
+
+    );
+
+}
+
+.metric-card.passiva::before{
+
+    background:
+
+    radial-gradient(
+
+        circle,
+
+        #3b82f6,
+
+        transparent 70%
+
+    );
+
+}
+
+.metric-card.economia::before{
+
+    background:
+
+    radial-gradient(
+
+        circle,
+
+        #06b6d4,
+
+        transparent 70%
+
+    );
+
+}
+
+.metric-card.saldo::before{
+
+    background:
+
+    radial-gradient(
+
+        circle,
+
+        #8b5cf6,
+
+        transparent 70%
+
+    );
+
+}
+
+.metric-card.gastos::before{
+
+    background:
+
+    radial-gradient(
+
+        circle,
+
+        #f97316,
+
+        transparent 70%
+
+    );
+
+}
+
+.metric-card:hover::before{
+
+    opacity:.35;
+
+    transform:scale(1.15);
+
+}

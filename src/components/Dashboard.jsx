@@ -38,34 +38,47 @@ function Dashboard({
     
         <div className="metrics-grid">
     
-            <MetricCard
-                titulo="Entradas"
-                valor={entradas}
-            />
+        <MetricCard
+            titulo="Saldo Atual"
+            valor={saldo}
+            delay={0}
+        />
+
+        <MetricCard
+            titulo="Entradas"
+            valor={entradas}
+            delay={100}
+        />
+
+        <MetricCard
+            titulo="Saídas"
+            valor={saidas}
+            delay={200}
+        />
+
+        <MetricCard
+            titulo="Investimentos"
+            valor={investimentos}
+            delay={300}
+        />
+
+        <MetricCard
+            titulo="Renda Passiva"
+            valor={rendaPassiva}
+            delay={400}
+        />
+
+        <MetricCard
+            titulo="Economia"
+            valor={economia}
+            delay={500}
+        />
+
     
             <MetricCard
-                titulo="Saídas"
-                valor={saidas}
-            />
-    
-            <MetricCard
-                titulo="Investimentos"
-                valor={investimentos}
-            />
-    
-            <MetricCard
-                titulo="Renda Passiva"
-                valor={rendaPassiva}
-            />
-    
-            <MetricCard
-                titulo="Economia"
-                valor={economia}
-            />
-    
-            <MetricCard
-                titulo="Teto"
-                valor={saidas}
+                titulo="Teto de Gastos"
+                valor={tetoGastos}
+                delay={600}
             >
                 <small>
                     {percentualGasto.toFixed(0)}% utilizado
