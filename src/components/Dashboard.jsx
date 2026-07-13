@@ -1,6 +1,7 @@
 import { calculateDashboardMetrics } from "../utils/dashboardMetrics";
 import MetricCard from "./cards/MetricCard";
 import ProgressBar from "./dashboard/ProgressBar";
+import { getDashboardInsights } from "../utils/dashboardInsights";
 
 function Dashboard({
     transactions,
@@ -18,6 +19,8 @@ function Dashboard({
     tetoGastos,
     percentualGasto,
   } = calculateDashboardMetrics(transactions);
+
+  const insights = getDashboardInsights(transactions);
 
   return (
 
