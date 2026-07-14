@@ -298,3 +298,32 @@ transform:translateY(0);
 
 }
 
+.metric-card small{
+
+    display:block;
+
+    margin-top:6px;
+
+    font-size:11px;
+
+    font-weight:600;
+
+}
+
+.metric-card .positive{
+
+    color:#22c55e;
+
+}
+
+.metric-card .negative{
+
+    color:#ef4444;
+
+}
+
+.metric-card .neutral{
+
+    color:#9ca3af;
+
+}

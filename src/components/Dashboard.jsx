@@ -47,23 +47,26 @@ function Dashboard({
             delay={0}
         />
 
-        <MetricCard
-            titulo="Entradas"
-            valor={entradas}
-            delay={100}
-        />
+            <MetricCard
+                titulo="Entradas"
+                valor={entradas}
+                insight={insights.entrada}
+                delay={100}
+            />
 
-        <MetricCard
-            titulo="Saídas"
-            valor={saidas}
-            delay={200}
-        />
+            <MetricCard
+                titulo="Saídas"
+                valor={saidas}
+                insight={insights.saida}
+                delay={200}
+            />
 
-        <MetricCard
-            titulo="Investimentos"
-            valor={investimentos}
-            delay={300}
-        />
+            <MetricCard
+                titulo="Investimentos"
+                valor={investimentos}
+                insight={insights.investimento}
+                delay={300}
+            />
 
         <MetricCard
             titulo="Renda Passiva"

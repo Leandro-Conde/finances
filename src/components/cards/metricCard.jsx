@@ -4,10 +4,11 @@ function MetricCard({
 
     titulo,
     valor,
+    insight,
+    delay,
     children,
-    delay = 0,
 
-}) {
+}){
 
     function getClass(){
 
@@ -74,6 +75,26 @@ function MetricCard({
                 )}
 
             </h2>
+
+            {insight !== null && insight !== undefined && (
+
+            <small
+                className={
+                    insight > 0
+                        ? "positive"
+                        : insight < 0
+                        ? "negative"
+                        : "neutral"
+                }
+            >
+
+                {insight > 0 ? "+" : ""}
+
+                {insight.toFixed(1)}%
+
+            </small>
+
+            )}
 
             {children}
 
