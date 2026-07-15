@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "../../services/supabase";
+import Register from "./Register";
 
 import "../../styles/login.css";
 
@@ -8,64 +9,42 @@ function Login() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
+    const [showRegister, setShowRegister] = useState(false);
 
     async function login() {
 
         setLoading(true);
-
+    
         const { error } = await supabase.auth.signInWithPassword({
-
+    
             email,
             password,
-
+    
         });
-
+    
         setLoading(false);
-
+    
         if (error) {
-
+    
             alert(error.message);
             return;
-
+    
         }
-
+    
     }
 
-    async function register() {
 
-        setLoading(true);
+    if (showRegister) {
+
+        return (
     
-        const { error } = await supabase.auth.signUp({
+            <Register
     
-            email,
-            password,
+                onBack={() => setShowRegister(false)}
     
-        });
+            />
     
-        if (error) {
-    
-            setLoading(false);
-            alert(error.message);
-            return;
-    
-        }
-    
-        const { error: loginError } =
-            await supabase.auth.signInWithPassword({
-    
-                email,
-                password,
-    
-            });
-    
-        setLoading(false);
-    
-        if (loginError) {
-    
-            alert(loginError.message);
-            return;
-    
-        }
+        );
     
     }
 
@@ -107,12 +86,14 @@ function Login() {
                 </button>
 
                 <button
+
                     className="register"
-                    onClick={register}
-                    disabled={loading}
+
+                    onClick={() => setShowRegister(true)}
+
                 >
 
-                    {loading ? "Criando..." : "Criar Conta"}
+                    Criar Conta
 
                 </button>
 
