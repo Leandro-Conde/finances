@@ -7,6 +7,9 @@ import ModalWizard from "./components/modal/ModalWizard";
 import Home from "./components/Home";
 import FilterBar from "./components/FilterBar";
 import Login from "./components/auth/Login";
+import { getLoans } from "./services/loanService";
+import LoanModal from "./components/LoanModal";
+import { createLoan } from "./services/loanService";
 
 import "./styles/dashboard.css";
 
@@ -22,6 +25,29 @@ function App() {
   const [filtro, setFiltro] = useState("Todos");
   const [user,setUser]=useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
+  const [loans, setLoans] = useState([]);
+  const [loanModalOpen,setLoanModalOpen]=useState(false);
+
+
+  async function saveLoan(loan){
+
+    await createLoan({
+
+        ...loan,
+
+        valor:Number(loan.valor),
+
+        status:"pendente",
+
+        user_id:user.id,
+
+    });
+
+    await loadLoans();
+
+    setLoanModalOpen(false);
+
+}
 
   async function loadTransactions() {
 
@@ -41,6 +67,16 @@ function App() {
     setTransactions(data);
   
   }
+
+  async function loadLoans() {
+
+    if (!user) return;
+
+    const data = await getLoans(user.id);
+
+    setLoans(data);
+
+}
 
   useEffect(() => {
 
@@ -68,10 +104,14 @@ function App() {
   useEffect(() => {
 
     if (user) {
-  
+
       loadTransactions();
   
-    }
+      loadLoans();
+  
+  }
+
+    
   
   }, [user]);
 
@@ -149,6 +189,24 @@ function App() {
 
       </Modal>
 
+      <Modal
+
+    isOpen={loanModalOpen}
+
+    onClose={()=>setLoanModalOpen(false)}
+
+>
+
+    <LoanModal
+
+        onClose={()=>setLoanModalOpen(false)}
+
+        onSave={saveLoan}
+
+    />
+
+    </Modal>
+
       <div className="actions">
 
         <button
@@ -176,6 +234,16 @@ function App() {
 
       </div>
 
+      <button
+
+    onClick={()=>setLoanModalOpen(true)}
+
+>
+
+    Novo Empréstimo
+
+</button>
+
       {showFilters && (
 
         <FilterBar
@@ -195,13 +263,55 @@ function App() {
 
         <div className="side-panel">
 
-          <div className="panel-card">
+        <div className="panel-card">
 
-            <h3>💰 Empréstimos</h3>
+        <div className="panel-header">
 
-            <p>Nenhuma dívida cadastrada.</p>
+            <h3>Empréstimos</h3>
 
-          </div>
+            <button
+
+                className="loan-add"
+
+                onClick={()=>setLoanModalOpen(true)}
+
+            >
+
+                +
+
+            </button>
+
+        </div>
+
+        {
+
+            loans.length===0 ?
+
+            (
+
+                <p>
+
+                    Nenhum empréstimo cadastrado.
+
+                </p>
+
+            )
+
+            :
+
+            (
+
+                <LoanList
+
+                    loans={loans}
+
+                />
+
+            )
+
+        }
+
+        </div>
 
           <div className="panel-card">
 

@@ -1,0 +1,75 @@
+function LoanCard({ loan }) {
+
+    return(
+
+        <div className={`loan-card ${loan.tipo}`}>
+
+            <div>
+
+                <strong>
+
+                    {loan.pessoa}
+
+                </strong>
+
+            </div>
+
+            <small>
+
+                {loan.descricao}
+
+            </small>
+
+            <h3>
+
+                {Number(loan.valor).toLocaleString(
+
+                    "pt-BR",
+
+                    {
+
+                        style:"currency",
+
+                        currency:"BRL",
+
+                    }
+
+                )}
+
+            </h3>
+
+            <div className="loan-footer">
+
+                <span>
+
+                    {
+
+                        loan.tipo==="receber"
+
+                        ?
+
+                        "Receber"
+
+                        :
+
+                        "Pagar"
+
+                    }
+
+                </span>
+
+                <span>
+
+                    {loan.status}
+
+                </span>
+
+            </div>
+
+        </div>
+
+    );
+
+}
+
+export default LoanCard;
