@@ -1,5 +1,6 @@
 import { supabase } from "../services/supabase";
 import "../styles/header.css";
+import Logo from "./common/Logo";
 
 function Header() {
 
@@ -14,7 +15,27 @@ function Header() {
 
   }
 
+  <div className="header-brand">
+
+  <Logo
+
+      variant="atlas"
+
+      size={42}
+
+  />
+
+  <h2>
+
+      Atlas Finance
+
+  </h2>
+
+</div>
+
   return (
+
+    
 
     <header className="header">
 

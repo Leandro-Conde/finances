@@ -11,6 +11,12 @@ function Register({ onBack }) {
     const [confirmPassword, setConfirmPassword] = useState("");
     const [loading, setLoading] = useState(false);
 
+    <BrandLogo
+  type="atlas"
+  size={90}
+  className="auth-logo"
+/>
+
     async function register() {
 
         setLoading(true);
@@ -76,6 +82,14 @@ function Register({ onBack }) {
     return (
 
         <div className="register-page">
+
+                <Logo
+
+                variant="atlas"
+
+                size={110}
+
+                />
 
             <div className="register-card">
 

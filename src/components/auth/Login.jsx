@@ -1,8 +1,18 @@
 import { useState } from "react";
 import { supabase } from "../../services/supabase";
 import Register from "./Register";
+import Logo from "../common/Logo";
 
 import "../../styles/login.css";
+import BrandLogo from "../BrandLogo";
+
+
+
+<BrandLogo
+  type="atlas"
+  size={90}
+  className="auth-logo"
+/>
 
 function Login() {
 
@@ -50,7 +60,17 @@ function Login() {
 
     return (
 
+        
+
         <div className="login-page">
+
+                <Logo
+
+                variant="atlas"
+
+                size={110}
+
+                />
 
             <div className="login-card">
 

@@ -151,3 +151,21 @@
     }
 
 }
+
+.auth-logo{
+
+    display:block;
+
+    margin:0 auto 20px;
+
+    transition:transform .35s ease, filter .35s ease;
+
+}
+
+.auth-logo:hover{
+
+    transform:translateY(-2px) scale(1.03);
+
+    filter:drop-shadow(0 0 18px rgba(139,92,246,.35));
+
+}
