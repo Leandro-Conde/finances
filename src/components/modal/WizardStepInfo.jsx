@@ -79,7 +79,7 @@ function WizardStepInfo({
 
             <select
 
-               defaultValue=""
+                value={formData.categoria}
 
                 onChange={(e) =>
 
@@ -163,25 +163,23 @@ function WizardStepInfo({
 
 </div>
 
-            <input
+        <input
+            placeholder="Descrição *"
+            value={formData.descricao}
+            onChange={(e)=>
 
-                placeholder="Descrição"
+                setFormData({
 
-                value={formData.descricao}
+                    ...formData,
 
-                onChange={(e)=>
+                    descricao:e.target.value,
 
-                    setFormData({
+                })
 
-                        ...formData,
+            }
 
-                        descricao:e.target.value,
-
-                    })
-
-                }
-
-            />
+            required
+        />
 
         <CurrencyInput
             placeholder="Valor"

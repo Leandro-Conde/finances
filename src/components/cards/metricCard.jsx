@@ -1,4 +1,5 @@
 import "../../styles/cards.css";
+import AnimatedNumber from "../common/AnimatedNumber";
 
 function MetricCard({
 
@@ -60,21 +61,13 @@ function MetricCard({
 
             <h2>
 
-                {valor.toLocaleString(
+            <AnimatedNumber
 
-                    "pt-BR",
+                value={valor}
 
-                    {
+            />
 
-                        style:"currency",
-
-                        currency:"BRL"
-
-                    }
-
-                )}
-
-            </h2>
+        </h2>
 
             {insight !== null && insight !== undefined && (
 

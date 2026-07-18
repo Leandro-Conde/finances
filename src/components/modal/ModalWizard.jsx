@@ -83,6 +83,20 @@ function ModalWizard({
 
 }, [user]);
 
+   function validarFormulario() {
+
+      if (!formData.categoria) return "Selecione uma categoria.";
+
+      if (!formData.descricao.trim()) return "Informe uma descrição.";
+
+      if (!formData.valor) return "Informe um valor.";
+
+      if (!formData.data) return "Informe uma data.";
+
+      return null;
+
+    }
+
 async function loadCategories() {
 
   try {
@@ -122,6 +136,34 @@ async function addCategory(nome, tipo) {
 
 }
 
+async function confirmarTudo() {
+
+  const erro = validarFormulario();
+
+  if (erro) {
+
+      alert(erro);
+
+      return;
+
+  }
+
+  const todas = [...pendingTransactions];
+
+  todas.push({
+
+      ...formData,
+
+      id: crypto.randomUUID(),
+
+      valor: parseCurrency(formData.valor),
+
+      user_id: user.id,
+
+  });
+
+}
+
   async function confirmarTudo() {
 
     const todas = [
@@ -130,7 +172,13 @@ async function addCategory(nome, tipo) {
 
     ];
 
-    if (formData.descricao !== "") {
+    if (!formData.descricao.trim()) {
+
+      alert("Descrição obrigatória.");
+  
+      return;
+  
+  }
 
       todas.push({
 
@@ -144,7 +192,6 @@ async function addCategory(nome, tipo) {
 
       });
 
-    }
 
     // garante que TODAS possuem dono
     const movimentacoes = todas.map((item) => ({
@@ -243,11 +290,53 @@ async function addCategory(nome, tipo) {
 
         {step > 1 && step < 3 && (
 
-          <button
-            onClick={() => setStep(step + 1)}
-          >
-            Próximo ➜
-          </button>
+    <button
+    onClick={() => {
+
+        if(step === 2){
+
+            if(!formData.categoria){
+
+                alert("Selecione uma categoria.");
+
+                return;
+
+            }
+
+            if(!formData.descricao.trim()){
+
+                alert("Informe uma descrição.");
+
+                return;
+
+            }
+
+            if(!formData.valor){
+
+                alert("Informe um valor.");
+
+                return;
+
+            }
+
+            if(!formData.data){
+
+                alert("Informe uma data.");
+
+                return;
+
+            }
+
+        }
+
+        setStep(step + 1);
+
+    }}
+    >
+
+    Próximo ➜
+
+    </button>
 
         )}
 

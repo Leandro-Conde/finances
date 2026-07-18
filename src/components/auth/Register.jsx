@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { supabase } from "../../services/supabase";
+//import Logo from "../../components/Logo";/
+import BrandLogo from "../../components/BrandLogo";
 
 import "../../styles/register.css";
 
@@ -11,11 +13,6 @@ function Register({ onBack }) {
     const [confirmPassword, setConfirmPassword] = useState("");
     const [loading, setLoading] = useState(false);
 
-    <BrandLogo
-  type="atlas"
-  size={90}
-  className="auth-logo"
-/>
 
     async function register() {
 

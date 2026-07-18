@@ -51,33 +51,33 @@ function Dashboard({
                 titulo="Entradas"
                 valor={entradas}
                 insight={insights.entrada}
-                delay={100}
+                delay={120}
             />
 
             <MetricCard
                 titulo="Saídas"
                 valor={saidas}
                 insight={insights.saida}
-                delay={200}
+                delay={240}
             />
 
             <MetricCard
                 titulo="Investimentos"
                 valor={investimentos}
                 insight={insights.investimento}
-                delay={300}
+                delay={360}
             />
 
         <MetricCard
             titulo="Renda Passiva"
             valor={rendaPassiva}
-            delay={400}
+            delay={480}
         />
 
         <MetricCard
             titulo="Economia"
             valor={economia}
-            delay={500}
+            delay={600}
         />
 
     
