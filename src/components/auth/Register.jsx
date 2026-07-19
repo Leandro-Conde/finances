@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { supabase } from "../../services/supabase";
 //import Logo from "../../components/Logo";/
-import BrandLogo from "../../components/BrandLogo";
+//import BrandLogo from "../../components/BrandLogo";/
 
 import "../../styles/register.css";
 
@@ -80,13 +80,6 @@ function Register({ onBack }) {
 
         <div className="register-page">
 
-                <Logo
-
-                variant="atlas"
-
-                size={110}
-
-                />
 
             <div className="register-card">
 
