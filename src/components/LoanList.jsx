@@ -1,22 +1,42 @@
 import LoanCard from "./LoanCard";
 
-function LoanList({ loans }) {
+function LoanList({
 
-    return (
+    loans,
+
+    onDelete,
+
+    onPay,
+
+    onEdit,
+
+}){
+
+    return(
 
         <>
 
-            {loans.map((loan)=>(
+            {
 
-                <LoanCard
+                loans.map((loan)=>(
 
-                    key={loan.id}
+                    <LoanCard
 
-                    loan={loan}
+                        key={loan.id}
 
-                />
+                        loan={loan}
 
-            ))}
+                        onDelete={onDelete}
+
+                        onPay={onPay}
+
+                        onEdit={onEdit}
+
+                    />
+
+                ))
+
+            }
 
         </>
 

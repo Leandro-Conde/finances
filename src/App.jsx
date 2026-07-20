@@ -1,4 +1,15 @@
 import { useEffect, useState } from "react";
+import {
+
+  getLoans,
+  createLoan,
+  deleteLoan,
+  markLoanAsPaid,
+  updateLoan,
+
+} from "./services/loanService";
+import LoanList from "./components/LoanList";
+import LoanModal from "./components/LoanModal";
 
 import Header from "./components/Header";
 import TransactionList from "./components/TransactionList";
@@ -7,13 +18,12 @@ import ModalWizard from "./components/modal/ModalWizard";
 import Home from "./components/Home";
 import FilterBar from "./components/FilterBar";
 import Login from "./components/auth/Login";
-import { getLoans } from "./services/loanService";
-import LoanModal from "./components/LoanModal";
-import { createLoan } from "./services/loanService";
+
 
 import "./styles/dashboard.css";
 
 import { supabase } from "./services/supabase";
+
 
 function App() {
 
@@ -27,27 +37,66 @@ function App() {
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [loans, setLoans] = useState([]);
   const [loanModalOpen,setLoanModalOpen]=useState(false);
+  const [editingLoan, setEditingLoan] = useState(null);
 
 
-  async function saveLoan(loan){
+async function removeLoan(id){
 
-    await createLoan({
+  if(!confirm("Excluir empréstimo?")) return;
 
-        ...loan,
+  await deleteLoan(id);
 
-        valor:Number(loan.valor),
-
-        status:"pendente",
-
-        user_id:user.id,
-
-    });
-
-    await loadLoans();
-
-    setLoanModalOpen(false);
+  await loadLoans();
 
 }
+
+async function payLoan(id){
+
+  await markLoanAsPaid(id);
+
+  await loadLoans();
+
+}
+
+
+    async function saveLoan(loan){
+
+      if(loan.id){
+
+          await updateLoan(
+
+              loan.id,
+
+              loan
+
+          );
+
+      }
+
+      else{
+
+          await createLoan({
+
+              ...loan,
+
+              valor:Number(loan.valor),
+
+              status:loan.status,
+
+              user_id:user.id,
+
+          });
+
+      }
+
+      await loadLoans();
+
+      setEditingLoan(null);
+
+      setLoanModalOpen(false);
+
+    }
+
 
   async function loadTransactions() {
 
@@ -197,13 +246,21 @@ function App() {
 
 >
 
-    <LoanModal
+      <LoanModal
 
-        onClose={()=>setLoanModalOpen(false)}
+      loan={editingLoan}
 
-        onSave={saveLoan}
+      onClose={() => {
 
-    />
+          setLoanModalOpen(false);
+
+          setEditingLoan(null);
+
+      }}
+
+      onSave={saveLoan}
+
+      />
 
     </Modal>
 
@@ -233,16 +290,6 @@ function App() {
         </button>
 
       </div>
-
-      <button
-
-    onClick={()=>setLoanModalOpen(true)}
-
->
-
-    Novo Empréstimo
-
-</button>
 
       {showFilters && (
 
@@ -301,11 +348,23 @@ function App() {
 
             (
 
-                <LoanList
+              <LoanList
 
-                    loans={loans}
+              loans={loans}
+          
+              onDelete={removeLoan}
+          
+              onPay={payLoan}
+          
+              onEdit={(loan)=>{
 
-                />
+                setEditingLoan(loan);
+            
+                setLoanModalOpen(true);
+            
+            }}
+          
+          />
 
             )
 

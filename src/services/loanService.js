@@ -52,3 +52,21 @@ export async function deleteLoan(id) {
     if (error) throw error;
 
 }
+
+export async function markLoanAsPaid(id){
+
+    const { error } = await supabase
+
+        .from("loans")
+
+        .update({
+
+            status:"pago",
+
+        })
+
+        .eq("id", id);
+
+    if(error) throw error;
+
+}
