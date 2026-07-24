@@ -70,3 +70,18 @@ export async function markLoanAsPaid(id){
     if(error) throw error;
 
 }
+
+export async function getLoanById(id) {
+
+    const { data, error } = await supabase
+
+        .from("loans")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+    if (error) throw error;
+
+    return data;
+
+}

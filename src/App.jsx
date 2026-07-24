@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
 
   getLoans,
+  getLoanById,
   createLoan,
   deleteLoan,
   markLoanAsPaid,
@@ -52,7 +53,36 @@ async function removeLoan(id){
 
 async function payLoan(id){
 
+  const loan = await getLoanById(id);
+
+  await supabase
+      .from("transactions")
+      .insert({
+
+          user_id: user.id,
+
+          tipo: loan.tipo === "receber"
+              ? "entrada"
+              : "saida",
+
+          categoria: "Empréstimos",
+
+          descricao:
+              loan.tipo === "receber"
+                  ? `Recebido de ${loan.pessoa}`
+                  : `Pagamento para ${loan.pessoa}`,
+
+          valor: Number(loan.valor),
+
+          data: new Date().toISOString().slice(0,10),
+
+          observacao: loan.descricao,
+
+      });
+
   await markLoanAsPaid(id);
+
+  await loadTransactions();
 
   await loadLoans();
 
