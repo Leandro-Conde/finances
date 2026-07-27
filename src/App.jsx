@@ -9,6 +9,10 @@ import {
   updateLoan,
 
 } from "./services/loanService";
+import {
+  getTransactions,
+  deleteTransaction,
+} from "./services/transactionService";
 import LoanList from "./components/LoanList";
 import LoanModal from "./components/LoanModal";
 
@@ -127,23 +131,21 @@ async function payLoan(id){
 
     }
 
+    async function loadTransactions() {
 
-  async function loadTransactions() {
-
-    if (!user) return;
+      if (!user) return;
   
-    const { data, error } = await supabase
-      .from("transactions")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("data", { ascending: false });
+      try {
   
-    if (error) {
-      console.error(error);
-      return;
-    }
+          const data = await getTransactions(user.id);
   
-    setTransactions(data);
+          setTransactions(data);
+  
+      } catch (err) {
+  
+          console.error(err);
+  
+      }
   
   }
 
@@ -194,16 +196,21 @@ async function payLoan(id){
   
   }, [user]);
 
-  async function deleteTransaction(id) {
+  async function removeTransaction(id) {
 
-    await supabase
-      .from("transactions")
-      .delete()
-      .eq("id", id);
+    try {
 
-    loadTransactions();
+        await deleteTransaction(id);
 
-  }
+        await loadTransactions();
+
+    } catch (err) {
+
+        console.error(err);
+
+    }
+
+}
 
   function editTransaction(transaction) {
 
@@ -332,11 +339,11 @@ async function payLoan(id){
 
       <div className="transactions-container">
 
-        <TransactionList
-          transactions={filteredTransactions}
-          deleteTransaction={deleteTransaction}
-          editTransaction={editTransaction}
-        />
+      <TransactionList
+    transactions={filteredTransactions}
+    deleteTransaction={removeTransaction}
+    editTransaction={editTransaction}
+/>
 
         <div className="side-panel">
 

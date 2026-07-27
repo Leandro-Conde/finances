@@ -3,8 +3,14 @@ import { useState, useEffect } from "react";
 import WizardStepType from "./WizardStepType";
 import WizardStepInfo from "./WizardStepInfo";
 import WizardStepReview from "./WizardStepReview";
+import {
 
-import { supabase } from "../../services/supabase";
+  createTransactions,
+
+  getTransactions,
+
+} from "../../services/transactionService";
+
 import { parseCurrency } from "../../utils/parseCurrency";
 
 import {
@@ -162,77 +168,25 @@ async function confirmarTudo() {
 
   });
 
+  try {
+
+      await createTransactions(todas);
+
+      const data = await getTransactions(user.id);
+
+      setTransactions(data);
+
+      onClose();
+
+  } catch (err) {
+
+      console.error(err);
+
+      alert("Erro ao salvar as movimentações.");
+
+  }
+
 }
-
-  async function confirmarTudo() {
-
-    const todas = [
-
-      ...pendingTransactions,
-
-    ];
-
-    if (!formData.descricao.trim()) {
-
-      alert("Descrição obrigatória.");
-  
-      return;
-  
-  }
-
-      todas.push({
-
-        ...formData,
-
-        id: crypto.randomUUID(),
-
-        valor: parseCurrency(formData.valor),
-
-        user_id: user.id,
-
-      });
-
-
-    // garante que TODAS possuem dono
-    const movimentacoes = todas.map((item) => ({
-
-      ...item,
-
-      user_id: user.id,
-
-    }));
-
-    const { error } = await supabase
-
-      .from("transactions")
-
-      .insert(movimentacoes);
-
-    if (error) {
-
-      console.error(error);
-
-      return;
-
-    }
-
-    const { data } = await supabase
-
-      .from("transactions")
-
-      .select("*")
-
-      .eq("user_id", user.id)
-
-      .order("data", {
-        ascending: false,
-      });
-
-    setTransactions(data);
-
-    onClose();
-
-  }
 
   console.log("Categorias do Modal:", categories);
 

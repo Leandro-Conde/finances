@@ -1,33 +1,62 @@
-import { useEffect, useState } from "react";
-import { supabase } from "./services/supabase";
+import { supabase } from "./supabase";
 
-export const transactionService = {
-  async getAll() {
-    return mockTransactions;
-  },
+export async function getTransactions(userId) {
 
-  async create(transaction) {
-    return transaction;
-  },
+    const { data, error } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("user_id", userId)
+        .order("data", { ascending: false });
 
-  async delete(id) {
-    return true;
-  },
-};
+    if (error) throw error;
 
-import { useEffect, useState } from "react";
-import { supabase } from "./services/supabase";
+    return data;
+}
 
-export const transactionService = {
-  async getAll() {
-    return mockTransactions;
-  },
+export async function createTransaction(transaction) {
 
-  async create(transaction) {
-    return transaction;
-  },
+    const { data, error } = await supabase
+        .from("transactions")
+        .insert(transaction)
+        .select();
 
-  async delete(id) {
-    return true;
-  },
-};
+    if (error) throw error;
+
+    return data[0];
+}
+
+export async function updateTransaction(id, values) {
+
+    const { error } = await supabase
+        .from("transactions")
+        .update(values)
+        .eq("id", id);
+
+    if (error) throw error;
+}
+
+export async function deleteTransaction(id) {
+
+    const { error } = await supabase
+        .from("transactions")
+        .delete()
+        .eq("id", id);
+
+    if (error) throw error;
+}
+
+export async function createTransactions(transactions) {
+
+  const { data, error } = await supabase
+
+      .from("transactions")
+
+      .insert(transactions)
+
+      .select();
+
+  if (error) throw error;
+
+  return data;
+
+}
