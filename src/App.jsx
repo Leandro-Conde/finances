@@ -1,4 +1,13 @@
 import { useEffect, useState } from "react";
+import GoalModal from "./components/GoalModal";
+
+import {
+
+    getGoal,
+    createGoal,
+    updateGoal,
+
+} from "./services/goalService";
 import {
 
   getLoans,
@@ -33,7 +42,6 @@ import { supabase } from "./services/supabase";
 function App() {
 
   const [transactions, setTransactions] = useState([]);
-  const [monthlyGoal] = useState(3000);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -43,6 +51,9 @@ function App() {
   const [loans, setLoans] = useState([]);
   const [loanModalOpen,setLoanModalOpen]=useState(false);
   const [editingLoan, setEditingLoan] = useState(null);
+  const [goal, setGoal] = useState(null);
+const [goalModalOpen, setGoalModalOpen] = useState(false);
+const [editingGoal, setEditingGoal] = useState(null);
 
 
 async function removeLoan(id){
@@ -159,6 +170,59 @@ async function payLoan(id){
 
 }
 
+async function loadGoal() {
+
+  if (!user) return;
+
+  const data = await getGoal(user.id);
+
+  setGoal(data);
+
+}
+
+async function saveGoal(goalData) {
+
+  if (goalData.id) {
+
+      await updateGoal(
+
+          goalData.id,
+
+          {
+
+              nome: goalData.nome,
+              valor_meta: Number(goalData.valor_meta),
+              valor_inicial: Number(goalData.valor_inicial),
+              prazo_meses: Number(goalData.prazo_meses),
+
+          }
+
+      );
+
+  } else {
+
+      await createGoal({
+
+          nome: goalData.nome,
+          valor_meta: Number(goalData.valor_meta),
+          valor_inicial: Number(goalData.valor_inicial),
+          prazo_meses: Number(goalData.prazo_meses),
+          user_id: user.id,
+
+      });
+
+  }
+
+  await loadGoal();
+
+  setGoalModalOpen(false);
+
+  setEditingGoal(null);
+
+}
+
+
+
   useEffect(() => {
 
     supabase.auth.getSession().then(({ data }) => {
@@ -189,6 +253,8 @@ async function payLoan(id){
       loadTransactions();
   
       loadLoans();
+
+      loadGoal();
   
   }
 
@@ -298,6 +364,38 @@ async function payLoan(id){
       onSave={saveLoan}
 
       />
+
+<Modal
+    isOpen={loanModalOpen}
+    onClose={() => setLoanModalOpen(false)}
+>
+
+    <LoanModal
+        loan={editingLoan}
+        onClose={() => {
+            setLoanModalOpen(false);
+            setEditingLoan(null);
+        }}
+        onSave={saveLoan}
+    />
+
+</Modal>
+
+<Modal
+    isOpen={goalModalOpen}
+    onClose={() => setGoalModalOpen(false)}
+>
+
+    <GoalModal
+        goal={editingGoal}
+        onClose={() => {
+            setGoalModalOpen(false);
+            setEditingGoal(null);
+        }}
+        onSave={saveGoal}
+    />
+
+</Modal>
 
     </Modal>
 
@@ -409,44 +507,77 @@ async function payLoan(id){
 
         </div>
 
-          <div className="panel-card">
+        <div className="panel-card">
 
-            <h3>🎯 Meta Mensal</h3>
+<div className="panel-header">
 
-            <p>
+    <h3>🎯 Meta Mensal</h3>
 
-              Meta
+    <button
+        className="loan-add"
+        onClick={() => {
+            setEditingGoal(goal);
+            setGoalModalOpen(true);
+        }}
+    >
+        +
+    </button>
 
-              <strong>
+</div>
 
-                {" "}
-                {monthlyGoal.toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                })}
+{goal ? (
+    <>
 
-              </strong>
+        <p>
 
-            </p>
+            <strong>{goal.nome}</strong>
 
-            <div className="goal-bar">
+        </p>
 
-              <div
+        <p>
+
+            Objetivo:{" "}
+
+            {Number(goal.valor_meta).toLocaleString("pt-BR", {
+                style: "currency",
+                currency: "BRL",
+            })}
+
+        </p>
+
+        <p>
+
+            Guardado:{" "}
+
+            {Number(goal.valor_inicial).toLocaleString("pt-BR", {
+                style: "currency",
+                currency: "BRL",
+            })}
+
+        </p>
+
+        <div className="goal-bar">
+
+            <div
                 className="goal-progress"
                 style={{
-                  width: "0%",
+                    width: `${Math.min(
+                        (goal.valor_inicial / goal.valor_meta) * 100,
+                        100
+                    )}%`,
                 }}
-              />
+            />
 
-            </div>
+        </div>
 
-            <small>
+    </>
+) : (
 
-              Ainda não implementado
+    <small>Nenhuma meta cadastrada.</small>
 
-            </small>
+)}
 
-          </div>
+</div>
 
           <div className="panel-card">
 
