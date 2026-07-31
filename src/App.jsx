@@ -341,63 +341,55 @@ async function saveGoal(goalData) {
 
       </Modal>
 
-      <Modal
+     {/* Modal Empréstimo */}
 
-    isOpen={loanModalOpen}
-
-    onClose={()=>setLoanModalOpen(false)}
-
->
-
-      <LoanModal
-
-      loan={editingLoan}
-
-      onClose={() => {
-
-          setLoanModalOpen(false);
-
-          setEditingLoan(null);
-
-      }}
-
-      onSave={saveLoan}
-
-      />
-
-<Modal
-    isOpen={loanModalOpen}
-    onClose={() => setLoanModalOpen(false)}
->
-
-    <LoanModal
-        loan={editingLoan}
+    <Modal
+        isOpen={loanModalOpen}
         onClose={() => {
+
             setLoanModalOpen(false);
             setEditingLoan(null);
+
         }}
-        onSave={saveLoan}
-    />
+    >
 
-</Modal>
+        <LoanModal
+            loan={editingLoan}
+            onClose={() => {
 
-<Modal
-    isOpen={goalModalOpen}
-    onClose={() => setGoalModalOpen(false)}
->
+                setLoanModalOpen(false);
+                setEditingLoan(null);
 
-    <GoalModal
-        goal={editingGoal}
-        onClose={() => {
-            setGoalModalOpen(false);
-            setEditingGoal(null);
-        }}
-        onSave={saveGoal}
-    />
-
-</Modal>
+            }}
+            onSave={saveLoan}
+        />
 
     </Modal>
+
+    {/* Modal Meta */}
+
+    <Modal
+        isOpen={goalModalOpen}
+        onClose={() => {
+
+            setGoalModalOpen(false);
+            setEditingGoal(null);
+
+        }}
+    >
+
+        <GoalModal
+            goal={editingGoal}
+            onClose={() => {
+
+                setGoalModalOpen(false);
+                setEditingGoal(null);
+
+            }}
+            onSave={saveGoal}
+        />
+
+</Modal>
 
       <div className="actions">
 
