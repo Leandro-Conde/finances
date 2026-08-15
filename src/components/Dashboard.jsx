@@ -5,7 +5,7 @@ import { getDashboardInsights } from "../utils/dashboardInsights";
 
 function Dashboard({
     transactions,
-    monthlyGoal,
+    goal,
 }) {
 
 
@@ -21,6 +21,16 @@ function Dashboard({
   } = calculateDashboardMetrics(transactions);
 
   const insights = getDashboardInsights(transactions);
+
+  const valorAtualMeta =
+    Number(goal?.valor_inicial || 0) + investimentos;
+
+const percentualMeta = goal?.valor_meta
+    ? Math.min(
+        (valorAtualMeta / Number(goal.valor_meta)) * 100,
+        100
+      )
+    : 0;
 
   return (
 
@@ -92,6 +102,46 @@ function Dashboard({
             </MetricCard>
     
         </div>
+        {goal && (
+    <div className="goal-dashboard-card">
+
+        <div className="goal-dashboard-header">
+
+            <h3>🎯 {goal.nome}</h3>
+
+            <strong>
+                {percentualMeta.toFixed(0)}%
+            </strong>
+
+        </div>
+
+        <p>
+            {valorAtualMeta.toLocaleString("pt-BR", {
+                style: "currency",
+                currency: "BRL",
+            })}
+
+            {" de "}
+
+            {Number(goal.valor_meta).toLocaleString("pt-BR", {
+                style: "currency",
+                currency: "BRL",
+            })}
+        </p>
+
+        <div className="goal-bar">
+
+            <div
+                className="goal-progress"
+                style={{
+                    width: `${percentualMeta}%`,
+                }}
+            />
+
+        </div>
+
+    </div>
+)}
     
     </section>
     
