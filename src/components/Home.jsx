@@ -3,14 +3,16 @@ import FinanceChart from "./charts/FinanceChart";
 
 import "../styles/home.css";
 
-function Home({ transactions }) {
+function Home({ transactions, goal }) {
   return (
+    
     <section className="home">
 
       <div className="left-panel">
-        <Dashboard
-          transactions={transactions}
-        />
+       <Dashboard
+      transactions={transactions}
+      goal={goal}
+    />
       </div>
 
       <div className="right-panel">

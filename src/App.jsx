@@ -403,8 +403,9 @@ async function saveGoal(goalData) {
       </div>
 
       <Home
-        transactions={filteredTransactions}
-      />
+      transactions={filteredTransactions}
+      goal={goal}
+/>
 
       <div className="filter-toggle">
 
