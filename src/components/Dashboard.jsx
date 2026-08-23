@@ -1,5 +1,5 @@
 import { calculateDashboardMetrics } from "../utils/dashboardMetrics";
-import MetricCard from "./cards/MetricCard";
+import MetricCard from "./cards/metricCard";
 import ProgressBar from "./dashboard/ProgressBar";
 import { getDashboardInsights } from "../utils/dashboardInsights";
 
