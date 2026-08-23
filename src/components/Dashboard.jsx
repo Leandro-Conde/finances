@@ -97,7 +97,7 @@ const percentualMeta = goal?.valor_meta
                 delay={600}
             >
                 <small>
-                    {percentualGasto.toFixed(0)}% utilizado
+                    {percentualGasto.toFixed(0)}% utilizado!
                 </small>
             </MetricCard>
     
@@ -141,7 +141,7 @@ const percentualMeta = goal?.valor_meta
         </div>
 
     </div>
-)}
+)} 
     
     </section>
     
