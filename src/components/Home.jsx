@@ -1,5 +1,5 @@
 import Dashboard from "./Dashboard";
-import FinanceChart from "./charts/FinanceChart";
+import FinanceChart from "./Charts/FinanceChart";
 
 import "../styles/home.css";
 
