@@ -80,3 +80,107 @@
     }
 
 }
+
+/* META MENSAL */
+
+.goal-add {
+    width: 28px;
+    height: 28px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 0;
+
+    border: 1px solid #3f3f46;
+    border-radius: 8px;
+
+    background: #27272a;
+    color: #fff;
+
+    font-size: 18px;
+    line-height: 1;
+
+    cursor: pointer;
+
+    transition:
+        background .2s ease,
+        border-color .2s ease,
+        transform .2s ease;
+}
+
+.goal-add:hover {
+    background: #7c3aed;
+    border-color: #8b5cf6;
+    transform: scale(1.08);
+}
+
+.goal-bar {
+    width: 100%;
+    height: 10px;
+
+    margin-top: 12px;
+
+    overflow: hidden;
+
+    background: #27272a;
+    border-radius: 999px;
+}
+
+.goal-progress {
+    height: 100%;
+
+    background: #7c3aed;
+
+    border-radius: 999px;
+
+    transition: width .5s ease;
+}
+
+/* CABEÇALHO DA META */
+
+.goal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    margin-bottom: 14px;
+}
+
+.goal-header h3 {
+    margin: 0;
+}
+
+.goal-add {
+    width: 28px;
+    height: 28px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 0;
+
+    border: 1px solid #3f3f46;
+    border-radius: 8px;
+
+    background: #27272a;
+    color: #fff;
+
+    font-size: 18px;
+    line-height: 1;
+
+    cursor: pointer;
+
+    transition:
+        background .2s ease,
+        border-color .2s ease,
+        transform .2s ease;
+}
+
+.goal-add:hover {
+    background: #7c3aed;
+    border-color: #8b5cf6;
+    transform: scale(1.08);
+}

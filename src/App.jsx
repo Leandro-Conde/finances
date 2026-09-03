@@ -318,6 +318,20 @@ async function saveGoal(goalData) {
         
         }
 
+        const totalInvestimentos = transactions
+    .filter((item) => item.tipo === "investimento")
+    .reduce((total, item) => total + Number(item.valor), 0);
+
+      const valorAtualMeta = goal
+    ? Number(goal.valor_inicial) + totalInvestimentos
+    : 0;
+
+     const percentualMeta = goal
+    ? Math.min(
+        (valorAtualMeta / Number(goal.valor_meta)) * 100,
+        100
+      )
+    : 0;
         
 
   return (
@@ -502,73 +516,79 @@ async function saveGoal(goalData) {
 
         <div className="panel-card">
 
-<div className="panel-header">
+        <div className="goal-header">
 
-    <h3>🎯 Meta Mensal</h3>
+      <h3>🎯 Meta Mensal</h3>
 
-    <button
-        className="loan-add"
-        onClick={() => {
-            setEditingGoal(goal);
-            setGoalModalOpen(true);
-        }}
-    >
-        +
-    </button>
+      <button
+          className="goal-add"
+          onClick={() => {
+              setEditingGoal(goal);
+              setGoalModalOpen(true);
+          }}
+      >
+          ✏️
+      </button>
 
-</div>
+      </div>
 
-{goal ? (
+      {goal ? (
     <>
 
-        <p>
-
+        <p className="goal-name">
             <strong>{goal.nome}</strong>
-
         </p>
 
-        <p>
+        <div className="goal-values">
 
-            Objetivo:{" "}
+            <strong className="goal-current">
+                {valorAtualMeta.toLocaleString("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                })}
+            </strong>
 
-            {Number(goal.valor_meta).toLocaleString("pt-BR", {
-                style: "currency",
-                currency: "BRL",
-            })}
+            <span>
+                // {" "}
+                {Number(goal.valor_meta).toLocaleString("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                })}
+            </span>
 
-        </p>
+        </div>
 
-        <p>
-
-            Guardado:{" "}
-
-            {Number(goal.valor_inicial).toLocaleString("pt-BR", {
-                style: "currency",
-                currency: "BRL",
-            })}
-
-        </p>
+        <div className="goal-percentage">
+            {percentualMeta.toFixed(0)}%
+        </div>
 
         <div className="goal-bar">
 
             <div
                 className="goal-progress"
                 style={{
-                    width: `${Math.min(
-                        (goal.valor_inicial / goal.valor_meta) * 100,
-                        100
-                    )}%`,
+                    width: `${percentualMeta}%`,
                 }}
             />
 
         </div>
 
+        <p className="goal-status">
+            {valorAtualMeta >= Number(goal.valor_meta)
+                ? "🎉 Meta atingida!"
+                : `Faltam ${(
+                    Number(goal.valor_meta) - valorAtualMeta
+                ).toLocaleString("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                })}`}
+        </p>
+
     </>
 ) : (
-
     <small>Nenhuma meta cadastrada.</small>
-
 )}
+  
 
 </div>
 
