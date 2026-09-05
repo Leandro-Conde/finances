@@ -14,13 +14,10 @@ import {
 import { parseCurrency } from "../../utils/parseCurrency";
 
 import {
-
   getCategories,
-
   createCategory,
-
-  /*deleteCategory,*/
-
+  deleteCategory,
+  updateCategory,
 } from "../../services/categoryService";
 
 function ModalWizard({
@@ -142,6 +139,54 @@ async function addCategory(nome, tipo) {
 
 }
 
+async function editarCategoria(category) {
+  const novoNome = prompt(
+      "Novo nome da categoria:",
+      category.nome
+  );
+
+  if (!novoNome || !novoNome.trim()) {
+      return;
+  }
+
+  try {
+      await updateCategory(category.id, {
+          nome: novoNome.trim(),
+      });
+
+      await loadCategories();
+
+  } catch (err) {
+      console.error("Erro ao editar categoria:", err);
+      alert("Erro ao editar categoria.");
+  }
+}
+
+async function removerCategoria(category) {
+  const confirmar = window.confirm(
+      `Excluir a categoria "${category.nome}"?`
+  );
+
+  if (!confirmar) return;
+
+  try {
+      await deleteCategory(category.id);
+
+      if (formData.categoria === category.nome) {
+          setFormData((prev) => ({
+              ...prev,
+              categoria: "",
+          }));
+      }
+
+      await loadCategories();
+
+  } catch (err) {
+      console.error("Erro ao excluir categoria:", err);
+      alert("Erro ao excluir categoria.");
+  }
+}
+
 async function confirmarTudo() {
 
   const erro = validarFormulario();
@@ -215,6 +260,8 @@ async function confirmarTudo() {
       setFormData={setFormData}
       categories={categories}
       addCategory={addCategory}
+      editarCategoria={editarCategoria}
+      removerCategoria={removerCategoria}
       />
 
       )}

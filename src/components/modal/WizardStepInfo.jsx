@@ -6,6 +6,8 @@ function WizardStepInfo({
     setFormData,
     categories,
     addCategory,
+    editarCategoria,
+    removerCategoria,
 }) {
     const categorias = {
 
@@ -53,11 +55,6 @@ function WizardStepInfo({
     const categoriasUsuario = categories.filter(
         (c) => c.tipo === formData.tipo
     );
-    
-    const listaFinal = [
-        ...categoriasPadrao,
-        ...categoriasUsuario.map((c) => c.nome),
-    ];
 
     
 
@@ -77,47 +74,159 @@ function WizardStepInfo({
 
             </h2>
 
+            <div className="category-section">
+
+<span className="category-title">
+    Categorias padrão
+</span>
+
+<select
+    className="category-select"
+    value={
+        categoriasPadrao.includes(formData.categoria)
+            ? formData.categoria
+            : ""
+    }
+    onChange={(e) =>
+        setFormData({
+            ...formData,
+            categoria: e.target.value,
+        })
+    }
+>
+    <option value="">Categoria</option>
+
+    {categoriasPadrao.map((categoria) => (
+        <option
+            key={`padrao-${categoria}`}
+            value={categoria}
+        >
+            {categoria}
+        </option>
+    ))}
+</select>
+
+
+{categoriasUsuario.length > 0 && (
+    <>
+        <span className="category-title">
+            Minhas categorias
+        </span>
+
+        <div className="custom-category-select">
+
             <select
-
-                value={formData.categoria}
-
-                onChange={(e) =>
-
-                    setFormData({
-
-                        ...formData,
-
-                        categoria: e.target.value,
-
-                    })
-
+                className="category-select"
+                value={
+                    categoriasUsuario.some(
+                        (c) => c.nome === formData.categoria
+                    )
+                        ? formData.categoria
+                        : ""
                 }
-
+                onChange={(e) =>
+                    setFormData({
+                        ...formData,
+                        categoria: e.target.value,
+                    })
+                }
             >
-
                 <option value="">
-
                     Categoria
-
                 </option>
 
-                {listaFinal.map((categoria) => (
-
+                {categoriasUsuario.map((categoria) => (
                     <option
-
-                        key={categoria}
-
-                        value={categoria}
-
+                        key={categoria.id}
+                        value={categoria.nome}
                     >
-
-                        {categoria}
-
+                        {categoria.nome}
                     </option>
-
                 ))}
-
             </select>
+
+            {categoriasUsuario.some(
+                (c) => c.nome === formData.categoria
+            ) && (
+                <div className="category-actions">
+                    {(() => {
+                        const selecionada =
+                            categoriasUsuario.find(
+                                (c) =>
+                                    c.nome ===
+                                    formData.categoria
+                            );
+
+                        return (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        editarCategoria(
+                                            selecionada
+                                        )
+                                    }
+                                    title="Editar"
+                                >
+                                    ✏️
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        removerCategoria(
+                                            selecionada
+                                        )
+                                    }
+                                    title="Excluir"
+                                >
+                                    🗑️
+                                </button>
+                            </>
+                        );
+                    })()}
+                </div>
+            )}
+
+        </div>
+    </>
+)}
+
+
+<div className="new-category">
+
+    <input
+        placeholder="Nova categoria"
+        value={novaCategoria}
+        onChange={(e) =>
+            setNovaCategoria(e.target.value)
+        }
+    />
+
+    <button
+        type="button"
+        onClick={async () => {
+            if (!novaCategoria.trim()) return;
+
+            await addCategory(
+                novaCategoria.trim(),
+                formData.tipo
+            );
+
+            setFormData((prev) => ({
+                ...prev,
+                categoria: novaCategoria.trim(),
+            }));
+
+            setNovaCategoria("");
+        }}
+    >
+        Adicionar
+    </button>
+
+</div>
+
+</div>
 
             <div className="new-category">
 
@@ -148,8 +257,7 @@ function WizardStepInfo({
                 categoria: novaCategoria,
             
             }));
-            
-            setNovaCategoria("");
+        
 
             setNovaCategoria("");
 
