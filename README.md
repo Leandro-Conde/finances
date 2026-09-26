@@ -1,16 +1,32 @@
-# React + Vite
+💰 **AtlasFinance — Sistema de Gestão Financeira Pessoal**
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Estou desenvolvendo o AtlasFinance, uma aplicação web para organização e acompanhamento das finanças pessoais.
 
-Currently, two official plugins are available:
+A ideia é centralizar em um único sistema informações como:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+📊 Controle de receitas e despesas
+💳 Gerenciamento de empréstimos
+🎯 Metas financeiras com acompanhamento de progresso
+📈 Dashboard com métricas e gráficos
+🏷️ Categorias personalizadas
+🔔 Contas recorrentes e lembretes de vencimento *(em desenvolvimento)*
 
-## React Compiler
+### 🛠️ Tecnologias
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+* React
+* Vite
+* JavaScript
+* Supabase
+* PostgreSQL
+* CSS
+* Git/GitHub
+* GitHub Pages
 
-## Expanding the ESLint configuration
+Um dos pontos que estou trabalhando no projeto é transformar os dados financeiros em informações realmente úteis para o usuário, conectando transações, investimentos, metas e compromissos futuros.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+O projeto também está sendo desenvolvido com autenticação e **Row Level Security (RLS)** no Supabase, garantindo a separação dos dados entre usuários.
+
+🚀 **Projeto:** https://leandro-conde.github.io/finances/
+💻 **Código:** https://github.com/leandro-conde/finances
+
+O AtlasFinance continua em desenvolvimento e novas funcionalidades estão sendo adicionadas gradualmente.
