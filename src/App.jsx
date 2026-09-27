@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react";
 import GoalModal from "./components/GoalModal";
+import ScheduledBillModal from "./components/ScheduledBillModal";
+
+import {
+  getScheduledBills,
+  createScheduledBill,
+  updateScheduledBill,
+  deleteScheduledBill,
+} from "./services/scheduledBillService";
 
 import {
 
@@ -52,9 +60,11 @@ function App() {
   const [loanModalOpen,setLoanModalOpen]=useState(false);
   const [editingLoan, setEditingLoan] = useState(null);
   const [goal, setGoal] = useState(null);
-const [goalModalOpen, setGoalModalOpen] = useState(false);
-const [editingGoal, setEditingGoal] = useState(null);
-
+  const [goalModalOpen, setGoalModalOpen] = useState(false);
+  const [editingGoal, setEditingGoal] = useState(null);
+  const [scheduledBills, setScheduledBills] = useState([]);
+  const [scheduledBillModalOpen, setScheduledBillModalOpen] = useState(false);
+  const [editingScheduledBill, setEditingScheduledBill] = useState(null);
 
 async function removeLoan(id){
 
@@ -180,6 +190,18 @@ async function loadGoal() {
 
 }
 
+async function loadScheduledBills() {
+  if (!user) return;
+
+  try {
+      const data = await getScheduledBills(user.id);
+      setScheduledBills(data);
+  } catch (error) {
+      console.error("ERRO AO CARREGAR CONTAS:", error);
+  }
+}
+    
+
 async function saveGoal(goalData) {
 
   if (goalData.id) {
@@ -246,21 +268,21 @@ async function saveGoal(goalData) {
 
 }, []);
 
-  useEffect(() => {
+useEffect(() => {
 
-    if (user) {
+  if (user) {
 
       loadTransactions();
-  
+
       loadLoans();
 
       loadGoal();
-  
+
+      loadScheduledBills();
+
   }
 
-    
-  
-  }, [user]);
+}, [user]);
 
   async function removeTransaction(id) {
 
@@ -332,7 +354,7 @@ async function saveGoal(goalData) {
         100
       )
     : 0;
-        
+
 
   return (
     <>
