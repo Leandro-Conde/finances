@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import GoalModal from "./components/GoalModal";
-import ScheduledBillModal from "./components/ScheduledBillModal";
 
 import {
   getScheduledBills,
@@ -40,6 +39,7 @@ import ModalWizard from "./components/modal/ModalWizard";
 import Home from "./components/Home";
 import FilterBar from "./components/FilterBar";
 import Login from "./components/auth/Login";
+import ScheduledBillModal from "./components/ScheduledBillModal";
 
 
 import "./styles/dashboard.css";
@@ -199,6 +199,41 @@ async function loadScheduledBills() {
   } catch (error) {
       console.error("ERRO AO CARREGAR CONTAS:", error);
   }
+}
+
+async function saveScheduledBill(bill) {
+  if (bill.id) {
+      await updateScheduledBill(
+          bill.id,
+          {
+              nome: bill.nome,
+              categoria: bill.categoria,
+              valor: Number(bill.valor),
+              tipo: bill.tipo,
+              vencimento: bill.vencimento,
+              recorrencia: bill.recorrencia,
+              dias_lembrete: Number(bill.dias_lembrete),
+              ativo: bill.ativo,
+          }
+      );
+  } else {
+      await createScheduledBill({
+          nome: bill.nome,
+          categoria: bill.categoria,
+          valor: Number(bill.valor),
+          tipo: bill.tipo,
+          vencimento: bill.vencimento,
+          recorrencia: bill.recorrencia,
+          dias_lembrete: Number(bill.dias_lembrete),
+          ativo: bill.ativo,
+          user_id: user.id,
+      });
+  }
+
+  await loadScheduledBills();
+
+  setScheduledBillModalOpen(false);
+  setEditingScheduledBill(null); 
 }
     
 
@@ -402,29 +437,42 @@ useEffect(() => {
 
     </Modal>
 
-    {/* Modal Meta */}
+   {/* Modal Meta */}
 
-    <Modal
-        isOpen={goalModalOpen}
+<Modal
+    isOpen={goalModalOpen}
+    onClose={() => {
+        setGoalModalOpen(false);
+        setEditingGoal(null);
+    }}
+>
+    <GoalModal
+        goal={editingGoal}
         onClose={() => {
-
             setGoalModalOpen(false);
             setEditingGoal(null);
-
         }}
-    >
+        onSave={saveGoal}
+    />
+</Modal>
 
-        <GoalModal
-            goal={editingGoal}
-            onClose={() => {
+{/* Modal Contas Agendadas */}
 
-                setGoalModalOpen(false);
-                setEditingGoal(null);
-
-            }}
-            onSave={saveGoal}
-        />
-
+<Modal
+    isOpen={scheduledBillModalOpen}
+    onClose={() => {
+        setScheduledBillModalOpen(false);
+        setEditingScheduledBill(null);
+    }}
+>
+    <ScheduledBillModal
+        bill={editingScheduledBill}
+        onClose={() => {
+            setScheduledBillModalOpen(false);
+            setEditingScheduledBill(null);
+        }}
+        onSave={saveScheduledBill}
+    />
 </Modal>
 
       <div className="actions">
@@ -614,13 +662,27 @@ useEffect(() => {
 
 </div>
 
-          <div className="panel-card">
+<div className="panel-card">
+    <div className="panel-header">
+        <h3>📅 Próximos Eventos</h3>
 
-            <h3>📅 Próximos Eventos</h3>
+        <button
+            className="loan-add"
+            onClick={() => {
+                setEditingScheduledBill(null);
+                setScheduledBillModalOpen(true);
+            }}
+        >
+            +
+        </button>
+    </div>
 
-            <p>Nenhum evento.</p>
-
-          </div>
+    {scheduledBills.length === 0 ? (
+        <p>Nenhuma conta agendada.</p>
+    ) : (
+        <p>{scheduledBills.length} conta(s) agendada(s).</p>
+    )}
+</div>
 
         </div>
 
