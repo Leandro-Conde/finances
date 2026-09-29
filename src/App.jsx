@@ -65,6 +65,7 @@ function App() {
   const [scheduledBills, setScheduledBills] = useState([]);
   const [scheduledBillModalOpen, setScheduledBillModalOpen] = useState(false);
   const [editingScheduledBill, setEditingScheduledBill] = useState(null);
+  const [showLoans, setShowLoans] = useState(true);
 
 async function removeLoan(id){
 
@@ -512,184 +513,239 @@ useEffect(() => {
 
       )}
 
-      <div className="transactions-container">
+<div className="transactions-container">
 
-      <TransactionList
-    transactions={filteredTransactions}
-    deleteTransaction={removeTransaction}
-    editTransaction={editTransaction}
-/>
+    <TransactionList
+        transactions={filteredTransactions}
+        deleteTransaction={removeTransaction}
+        editTransaction={editTransaction}
+    />
 
-        <div className="side-panel">
+    <div className="side-panel">
 
+        {/* Empréstimos */}
         <div className="panel-card">
 
-        <div className="panel-header">
+            <div className="panel-header">
 
-            <h3>Empréstimos</h3>
+                <h3>Empréstimos</h3>
 
-            <button
+                <div className="loan-actions">
 
-                className="loan-add"
+                    <button
+                        className="loan-add"
+                        onClick={() => setLoanModalOpen(true)}
+                    >
+                        +
+                    </button>
 
-                onClick={()=>setLoanModalOpen(true)}
+                    <button
+                        className="loan-toggle"
+                        onClick={() => setShowLoans(!showLoans)}
+                    >
+                        {showLoans ? "−" : "+"}
+                    </button>
 
-            >
+                </div>
 
-                +
+            </div>
 
-            </button>
+            {showLoans && (
+                loans.length === 0 ? (
+                    <p>
+                        Nenhum empréstimo cadastrado.
+                    </p>
+                ) : (
+                    <LoanList
+                        loans={loans}
+                        onDelete={removeLoan}
+                        onPay={payLoan}
+                        onEdit={(loan) => {
+                            setEditingLoan(loan);
+                            setLoanModalOpen(true);
+                        }}
+                    />
+                )
+            )}
 
         </div>
 
-        {
 
-            loans.length===0 ?
+        {/* Meta Mensal */}
+        <div className="panel-card">
 
-            (
+            <div className="goal-header">
 
+                <h3>🎯 Meta Mensal</h3>
+
+                <button
+                    className="goal-add"
+                    onClick={() => {
+                        setEditingGoal(goal);
+                        setGoalModalOpen(true);
+                    }}
+                >
+                    ✏️
+                </button>
+
+            </div>
+
+            {goal ? (
+                <>
+
+                    <p className="goal-name">
+                        <strong>{goal.nome}</strong>
+                    </p>
+
+                    <div className="goal-values">
+
+                        <strong className="goal-current">
+                            {valorAtualMeta.toLocaleString("pt-BR", {
+                                style: "currency",
+                                currency: "BRL",
+                            })}
+                        </strong>
+
+                        <span>
+                            /{" "}
+                            {Number(goal.valor_meta).toLocaleString("pt-BR", {
+                                style: "currency",
+                                currency: "BRL",
+                            })}
+                        </span>
+
+                    </div>
+
+                    <div className="goal-percentage">
+                        {percentualMeta.toFixed(0)}%
+                    </div>
+
+                    <div className="goal-bar">
+
+                        <div
+                            className="goal-progress"
+                            style={{
+                                width: `${percentualMeta}%`,
+                            }}
+                        />
+
+                    </div>
+
+                    <p className="goal-status">
+
+                        {valorAtualMeta >= Number(goal.valor_meta)
+                            ? "🎉 Meta atingida!"
+                            : `Faltam ${(
+                                Number(goal.valor_meta) - valorAtualMeta
+                            ).toLocaleString("pt-BR", {
+                                style: "currency",
+                                currency: "BRL",
+                            })}`}
+
+                    </p>
+
+                </>
+            ) : (
+                <small>
+                    Nenhuma meta cadastrada.
+                </small>
+            )}
+
+        </div>
+
+
+        {/* Próximos Eventos */}
+        <div className="panel-card">
+
+            <div className="panel-header">
+
+                <h3>📅 Próximos Eventos</h3>
+
+                <button
+                    className="loan-add"
+                    onClick={() => {
+                        setEditingScheduledBill(null);
+                        setScheduledBillModalOpen(true);
+                    }}
+                >
+                    +
+                </button>
+
+            </div>
+
+            {scheduledBills.length === 0 ? (
                 <p>
-
-                    Nenhum empréstimo cadastrado.
-
+                    Nenhuma conta agendada.
                 </p>
+            ) : (
+                <div className="scheduled-bills-list">
 
-            )
+                    {scheduledBills.map((bill) => {
 
-            :
+                        const hoje = new Date();
 
-            (
+                        const vencimento = new Date(
+                            `${bill.vencimento}T00:00:00`
+                        );
 
-              <LoanList
+                        const diferenca = Math.ceil(
+                            (vencimento - hoje) /
+                            (1000 * 60 * 60 * 24)
+                        );
 
-              loans={loans}
-          
-              onDelete={removeLoan}
-          
-              onPay={payLoan}
-          
-              onEdit={(loan)=>{
+                        return (
+                            <div
+                                className="scheduled-bill-item"
+                                key={bill.id}
+                            >
 
-                setEditingLoan(loan);
-            
-                setLoanModalOpen(true);
-            
-            }}
-          
-          />
+                                <div className="scheduled-bill-info">
 
-            )
+                                    <strong>
+                                        {bill.nome}
+                                    </strong>
 
-        }
+                                    <span>
+                                        {bill.categoria}
+                                    </span>
 
-        </div>
+                                    <small>
+                                        Vence em{" "}
+                                        {diferenca <= 0
+                                            ? "hoje"
+                                            : `${diferenca} dia${diferenca > 1 ? "s" : ""}`}
+                                    </small>
 
-        <div className="panel-card">
+                                </div>
 
-        <div className="goal-header">
+                                <strong className="scheduled-bill-value">
 
-      <h3>🎯 Meta Mensal</h3>
+                                    {Number(bill.valor).toLocaleString(
+                                        "pt-BR",
+                                        {
+                                            style: "currency",
+                                            currency: "BRL",
+                                        }
+                                    )}
 
-      <button
-          className="goal-add"
-          onClick={() => {
-              setEditingGoal(goal);
-              setGoalModalOpen(true);
-          }}
-      >
-          ✏️
-      </button>
+                                    </strong>
 
-      </div>
+                          </div>
+                        );
+                  })}
 
-      {goal ? (
-    <>
+          </div>
+      )}
 
-        <p className="goal-name">
-            <strong>{goal.nome}</strong>
-        </p>
-
-        <div className="goal-values">
-
-            <strong className="goal-current">
-                {valorAtualMeta.toLocaleString("pt-BR", {
-                    style: "currency",
-                    currency: "BRL",
-                })}
-            </strong>
-
-            <span>
-                // {" "}
-                {Number(goal.valor_meta).toLocaleString("pt-BR", {
-                    style: "currency",
-                    currency: "BRL",
-                })}
-            </span>
-
-        </div>
-
-        <div className="goal-percentage">
-            {percentualMeta.toFixed(0)}%
-        </div>
-
-        <div className="goal-bar">
-
-            <div
-                className="goal-progress"
-                style={{
-                    width: `${percentualMeta}%`,
-                }}
-            />
-
-        </div>
-
-        <p className="goal-status">
-            {valorAtualMeta >= Number(goal.valor_meta)
-                ? "🎉 Meta atingida!"
-                : `Faltam ${(
-                    Number(goal.valor_meta) - valorAtualMeta
-                ).toLocaleString("pt-BR", {
-                    style: "currency",
-                    currency: "BRL",
-                })}`}
-        </p>
-
-    </>
-) : (
-    <small>Nenhuma meta cadastrada.</small>
-)}
-  
+  </div>
 
 </div>
 
-<div className="panel-card">
-    <div className="panel-header">
-        <h3>📅 Próximos Eventos</h3>
-
-        <button
-            className="loan-add"
-            onClick={() => {
-                setEditingScheduledBill(null);
-                setScheduledBillModalOpen(true);
-            }}
-        >
-            +
-        </button>
-    </div>
-
-    {scheduledBills.length === 0 ? (
-        <p>Nenhuma conta agendada.</p>
-    ) : (
-        <p>{scheduledBills.length} conta(s) agendada(s).</p>
-    )}
 </div>
 
-        </div>
+</>
 
-      </div>
-
-    </>
-  );
+);
 
 }
 

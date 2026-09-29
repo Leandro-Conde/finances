@@ -14,7 +14,7 @@ function LoanList({
 
     return(
 
-        <>
+        <div className="loan-list">
 
             {
 
@@ -38,7 +38,7 @@ function LoanList({
 
             }
 
-        </>
+        </div>
 
     );
 
