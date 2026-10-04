@@ -7,19 +7,13 @@ function TransactionItem({
 }) {
 
     const cores = {
-
-        entrada:"#22c55e",
-
-        saida:"#ef4444",
-
-        investimento:"#facc15",
-
-        renda_passiva:"#3b82f6",
-
+        entrada: "#22c55e",
+        saida: "#ef4444",
+        investimento: "#facc15",
+        renda_passiva: "#3b82f6",
     };
 
     return (
-
         <div className="transaction-item">
 
             <div className="transaction-left">
@@ -27,8 +21,7 @@ function TransactionItem({
                 <span
                     className="transaction-dot"
                     style={{
-                        background:
-                        cores[transaction.tipo]
+                        background: cores[transaction.tipo],
                     }}
                 />
 
@@ -39,10 +32,14 @@ function TransactionItem({
                     </h3>
 
                     <small>
-
                         {transaction.categoria}
-
                     </small>
+
+                    <div className="transaction-date">
+                        {new Date(
+                            transaction.data + "T00:00:00"
+                        ).toLocaleDateString("pt-BR")}
+                    </div>
 
                 </div>
 
@@ -51,21 +48,19 @@ function TransactionItem({
             <div className="transaction-right">
 
                 <h3>
-
                     {transaction.valor.toLocaleString(
                         "pt-BR",
                         {
-                            style:"currency",
-                            currency:"BRL",
+                            style: "currency",
+                            currency: "BRL",
                         }
                     )}
-
                 </h3>
 
                 <div>
 
                     <button
-                        onClick={()=>
+                        onClick={() =>
                             editTransaction(transaction)
                         }
                     >
@@ -73,7 +68,7 @@ function TransactionItem({
                     </button>
 
                     <button
-                        onClick={()=>
+                        onClick={() =>
                             deleteTransaction(transaction.id)
                         }
                     >
@@ -85,9 +80,7 @@ function TransactionItem({
             </div>
 
         </div>
-
     );
-
 }
 
 export default TransactionItem;
