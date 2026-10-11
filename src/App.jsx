@@ -68,6 +68,8 @@ function App() {
   const [editingScheduledBill, setEditingScheduledBill] = useState(null);
 
   const [showLoans, setShowLoans] = useState(true);
+  const [showScheduledBills, setShowScheduledBills] = useState(true);
+  const [showTransactions, setShowTransactions] = useState(true);
 
   async function removeLoan(id) {
     if (!confirm("Excluir empréstimo?")) return;
@@ -462,61 +464,79 @@ function App() {
       <div className="transactions-container">
 
         {/* Últimas Transações */}
-        <TransactionList
-          transactions={filteredTransactions}
-          deleteTransaction={removeTransaction}
-          editTransaction={editTransaction}
-        />
+<div className="panel-card">
+  <div className="panel-header">
+    <h3>Últimas Transações</h3>
+
+    {filteredTransactions.length >= 2 && (
+      <button
+        className="loan-toggle"
+        onClick={() => setShowTransactions(!showTransactions)}
+        title={showTransactions ? "Recolher lista" : "Expandir lista"}
+      >
+        {showTransactions ? "Fechar" : "Abrir"}
+      </button>
+    )}
+  </div>
+
+  {(showTransactions || filteredTransactions.length < 2) && (
+    <TransactionList
+      transactions={filteredTransactions}
+      deleteTransaction={removeTransaction}
+      editTransaction={editTransaction}
+    />
+  )}
+</div>
 
         <div className="side-panel">
 
-          {/* Empréstimos */}
-          <div className="panel-card">
+                {/* Empréstimos */}
+        <div className="panel-card">
 
-            <div className="panel-header">
-              <h3>Empréstimos</h3>
+        <div className="panel-header">
+      <h3>Empréstimos</h3>
 
-              <div className="loan-actions">
+      <div className="loan-actions">
+        <button
+          className="loan-add"
+          onClick={() => {
+            setEditingLoan(null);
+            setLoanModalOpen(true);
+          }}
+          title="Adicionar empréstimo"
+        >
+          +
+        </button>
 
-                <button
-                  className="loan-add"
-                  onClick={() => {
-                    setEditingLoan(null);
-                    setLoanModalOpen(true);
-                  }}
-                >
-                  +
-                </button>
+        {loans.length >= 2 && (
+          <button
+            className="loan-toggle"
+            onClick={() => setShowLoans(!showLoans)}
+            title={showLoans ? "Recolher lista" : "Expandir lista"}
+          >
+            {showLoans ? "Fechar" : "Abrir"}
+          </button>
+        )}
+      </div>
+    </div>
 
-                <button
-                  className="loan-toggle"
-                  onClick={() =>
-                    setShowLoans(!showLoans)
-                  }
-                >
-                  {showLoans ? "−" : "+"}
-                </button>
+        {showLoans && (
+          loans.length === 0 ? (
+            <p>Nenhum empréstimo cadastrado.</p>
+          ) : (
+            <LoanList
+              loans={loans}
+              onDelete={removeLoan}
+              onPay={payLoan}
+              onEdit={(loan) => {
+                setEditingLoan(loan);
+                setLoanModalOpen(true);
+              }}
+            />
+          )
+        )}
 
-              </div>
-            </div>
-
-            {showLoans &&
-              (loans.length === 0 ? (
-                <p>
-                  Nenhum empréstimo cadastrado.
-                </p>
-              ) : (
-                <LoanList
-                  loans={loans}
-                  onDelete={removeLoan}
-                  onPay={payLoan}
-                  onEdit={(loan) => {
-                    setEditingLoan(loan);
-                    setLoanModalOpen(true);
-                  }}
-                />
-              ))}
-          </div>
+        </div>
 
           {/* Meta Mensal */}
           <div className="panel-card">
@@ -617,135 +637,96 @@ function App() {
 
           {/* Próximos Eventos */}
           <div className="panel-card">
+          <div className="panel-header">
+  <h3>📅 Próximos Eventos</h3>
 
-            <div className="panel-header">
+  <div className="loan-actions">
+    <button
+      className="loan-add"
+      onClick={() => {
+        setEditingScheduledBill(null);
+        setScheduledBillModalOpen(true);
+      }}
+    >
+      +
+    </button>
 
-              <h3>📅 Próximos Eventos</h3>
+    {scheduledBills.length >= 2 && (
+      <button
+        className="loan-toggle"
+        onClick={() => setShowScheduledBills(!showScheduledBills)}
+        title={showScheduledBills ? "Recolher lista" : "Expandir lista"}
+      >
+        {showScheduledBills ? "Fechar" : "Abrir"}
+      </button>
+    )}
+  </div>
+</div>
 
-              <button
-                className="loan-add"
-                onClick={() => {
-                  setEditingScheduledBill(null);
-                  setScheduledBillModalOpen(true);
-                }}
-              >
-                +
-              </button>
+{scheduledBills.length === 0 ? (
+  <p>Nenhuma conta agendada.</p>
+) : (
+  (showScheduledBills || scheduledBills.length < 2) && (
+    <div className="scheduled-bills-list">
+      {scheduledBills.map((bill) => {
+        const hoje = new Date();
 
+        const vencimento = new Date(`${bill.vencimento}T00:00:00`);
+
+        const diferenca = Math.ceil(
+          (vencimento - hoje) / (1000 * 60 * 60 * 24)
+        );
+
+        return (
+          <div className="scheduled-bill-item" key={bill.id}>
+            <div className="scheduled-bill-info">
+              <strong>{bill.nome}</strong>
+
+              <span>{bill.categoria}</span>
+
+              <small>
+                Vence em{" "}
+                {diferenca <= 0
+                  ? "hoje"
+                  : `${diferenca} dia${diferenca > 1 ? "s" : ""}`}
+              </small>
             </div>
 
-            {scheduledBills.length === 0 ? (
-              <p>
-                Nenhuma conta agendada.
-              </p>
-            ) : (
-              <div className="scheduled-bills-list">
-
-                {scheduledBills.map((bill) => {
-
-                  const hoje = new Date();
-
-                  const vencimento =
-                    new Date(
-                      `${bill.vencimento}T00:00:00`
-                    );
-
-                  const diferenca =
-                    Math.ceil(
-                      (vencimento - hoje) /
-                        (1000 *
-                          60 *
-                          60 *
-                          24)
-                    );
-
-                  return (
-                    <div
-                      className="scheduled-bill-item"
-                      key={bill.id}
-                    >
-
-                      <div className="scheduled-bill-info">
-
-                        <strong>
-                          {bill.nome}
-                        </strong>
-
-                        <span>
-                          {bill.categoria}
-                        </span>
-
-                        <small>
-                          Vence em{" "}
-                          {diferenca <= 0
-                            ? "hoje"
-                            : `${diferenca} dia${
-                                diferenca > 1
-                                  ? "s"
-                                  : ""
-                              }`}
-                        </small>
-
-                      </div>
-
-                      <div className="scheduled-bill-right">
-
-                        <strong className="scheduled-bill-value">
-                          {Number(
-                            bill.valor
-                          ).toLocaleString(
-                            "pt-BR",
-                            {
-                              style:
-                                "currency",
-                              currency:
-                                "BRL",
-                            }
-                          )}
-                        </strong>
-
-                        <div className="scheduled-bill-actions">
-
-                          {/* Editar */}
-                          <button
-                            className="scheduled-bill-edit"
-                            onClick={() => {
-                              setEditingScheduledBill(
-                                bill
-                              );
-
-                              setScheduledBillModalOpen(
-                                true
-                              );
-                            }}
-                            title="Editar conta"
-                          >
-                            ✏️
-                          </button>
-
-                          {/* Excluir */}
-                          <button
-                            className="scheduled-bill-delete"
-                            onClick={() =>
-                              removeScheduledBill(
-                                bill.id
-                              )
-                            }
-                            title="Excluir conta"
-                          >
-                            🗑️
-                          </button>
-
-                        </div>
-
-                      </div>
-
-                    </div>
-                  );
+            <div className="scheduled-bill-right">
+              <strong className="scheduled-bill-value">
+                {Number(bill.valor).toLocaleString("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
                 })}
+              </strong>
 
+              <div className="scheduled-bill-actions">
+                <button
+                  className="scheduled-bill-edit"
+                  onClick={() => {
+                    setEditingScheduledBill(bill);
+                    setScheduledBillModalOpen(true);
+                  }}
+                  title="Editar conta"
+                >
+                  ✏️
+                </button>
+
+                <button
+                  className="scheduled-bill-delete"
+                  onClick={() => removeScheduledBill(bill.id)}
+                  title="Excluir conta"
+                >
+                  🗑️
+                </button>
               </div>
-            )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  )
+)}
 
           </div>
 

@@ -274,3 +274,43 @@
 .loan-list::-webkit-scrollbar-thumb:hover {
     background: #7c3aed;
 }
+
+/* Cabeçalho da funcionalidade */
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.panel-header h3 {
+    margin: 0;
+}
+
+/* Botões no canto superior direito */
+.loan-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+/* Controle discreto de abrir/fechar */
+.loan-toggle {
+    padding: 4px 7px;
+    min-width: auto;
+    border: 1px solid #333338;
+    border-radius: 6px;
+    background: transparent;
+    color: #a1a1aa;
+    font-size: 10px;
+    line-height: 1.2;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.loan-toggle:hover {
+    background: #27272a;
+    color: #e4e4e7;
+}
