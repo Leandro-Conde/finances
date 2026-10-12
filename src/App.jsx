@@ -28,6 +28,11 @@ import {
   deleteTransaction,
 } from "./services/transactionService";
 
+import {
+  getUserSettings,
+  saveSpendingLimit,
+} from "./services/userSettingsService";
+
 import LoanList from "./components/LoanList";
 import LoanModal from "./components/LoanModal";
 
@@ -70,6 +75,8 @@ function App() {
   const [showLoans, setShowLoans] = useState(true);
   const [showScheduledBills, setShowScheduledBills] = useState(true);
   const [showTransactions, setShowTransactions] = useState(true);
+
+  const [limiteGastos, setLimiteGastos] = useState(3000);
 
   async function removeLoan(id) {
     if (!confirm("Excluir empréstimo?")) return;
@@ -157,6 +164,30 @@ function App() {
 
     setGoal(data);
   }
+
+  async function loadUserSettings() {
+    if (!user) return;
+
+    try {
+        const limite = await getUserSettings(user.id);
+        setLimiteGastos(limite);
+    } catch (error) {
+        console.error("Erro ao carregar configurações:", error);
+    }
+}
+
+async function handleSaveSpendingLimit(novoLimite) {
+    if (!user) {
+        throw new Error("Usuário não autenticado.");
+    }
+
+    const limiteSalvo = await saveSpendingLimit(
+        user.id,
+        novoLimite
+    );
+
+    setLimiteGastos(limiteSalvo);
+}
 
   async function loadScheduledBills() {
     if (!user) return;
@@ -270,12 +301,13 @@ function App() {
 
   useEffect(() => {
     if (user) {
-      loadTransactions();
-      loadLoans();
-      loadGoal();
-      loadScheduledBills();
+        loadTransactions();
+        loadLoans();
+        loadGoal();
+        loadScheduledBills();
+        loadUserSettings();
     }
-  }, [user]);
+}, [user]);
 
   async function removeTransaction(id) {
     try {
@@ -436,9 +468,14 @@ function App() {
 
       {/* Dashboard */}
       <Home
-        transactions={filteredTransactions}
-        goal={goal}
-      />
+    transactions={filteredTransactions}
+    allTransactions={transactions}
+    loans={loans}
+    scheduledBills={scheduledBills}
+    goal={goal}
+    limiteGastos={limiteGastos}
+    onSalvarLimiteGastos={handleSaveSpendingLimit}
+/>
 
       {/* Filtros */}
       <div className="filter-toggle">
