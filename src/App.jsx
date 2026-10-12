@@ -1,5 +1,8 @@
+
 import { useEffect, useState } from "react";
+
 import GoalModal from "./components/GoalModal";
+import Profile from "./pages/Profile";
 
 import {
   getScheduledBills,
@@ -35,7 +38,6 @@ import {
 
 import LoanList from "./components/LoanList";
 import LoanModal from "./components/LoanModal";
-
 import Header from "./components/Header";
 import TransactionList from "./components/TransactionList";
 import Modal from "./components/Modal";
@@ -78,6 +80,9 @@ function App() {
 
   const [limiteGastos, setLimiteGastos] = useState(3000);
 
+  // Controla a navegação entre o dashboard e o perfil.
+  const [currentPage, setCurrentPage] = useState("home");
+
   async function removeLoan(id) {
     if (!confirm("Excluir empréstimo?")) return;
 
@@ -88,28 +93,18 @@ function App() {
   async function payLoan(id) {
     const loan = await getLoanById(id);
 
-    await supabase
-      .from("transactions")
-      .insert({
-        user_id: user.id,
-
-        tipo: loan.tipo === "receber"
-          ? "entrada"
-          : "saida",
-
-        categoria: "Empréstimos",
-
-        descricao:
-          loan.tipo === "receber"
-            ? `Recebido de ${loan.pessoa}`
-            : `Pagamento para ${loan.pessoa}`,
-
-        valor: Number(loan.valor),
-
-        data: new Date().toISOString().slice(0, 10),
-
-        observacao: loan.descricao,
-      });
+    await supabase.from("transactions").insert({
+      user_id: user.id,
+      tipo: loan.tipo === "receber" ? "entrada" : "saida",
+      categoria: "Empréstimos",
+      descricao:
+        loan.tipo === "receber"
+          ? `Recebido de ${loan.pessoa}`
+          : `Pagamento para ${loan.pessoa}`,
+      valor: Number(loan.valor),
+      data: new Date().toISOString().slice(0, 10),
+      observacao: loan.descricao,
+    });
 
     await markLoanAsPaid(id);
 
@@ -119,10 +114,7 @@ function App() {
 
   async function saveLoan(loan) {
     if (loan.id) {
-      await updateLoan(
-        loan.id,
-        loan
-      );
+      await updateLoan(loan.id, loan);
     } else {
       await createLoan({
         ...loan,
@@ -153,7 +145,6 @@ function App() {
     if (!user) return;
 
     const data = await getLoans(user.id);
-
     setLoans(data);
   }
 
@@ -161,7 +152,6 @@ function App() {
     if (!user) return;
 
     const data = await getGoal(user.id);
-
     setGoal(data);
   }
 
@@ -169,56 +159,49 @@ function App() {
     if (!user) return;
 
     try {
-        const limite = await getUserSettings(user.id);
-        setLimiteGastos(limite);
+      const limite = await getUserSettings(user.id);
+      setLimiteGastos(limite);
     } catch (error) {
-        console.error("Erro ao carregar configurações:", error);
+      console.error("Erro ao carregar configurações:", error);
     }
-}
+  }
 
-async function handleSaveSpendingLimit(novoLimite) {
+  async function handleSaveSpendingLimit(novoLimite) {
     if (!user) {
-        throw new Error("Usuário não autenticado.");
+      throw new Error("Usuário não autenticado.");
     }
 
     const limiteSalvo = await saveSpendingLimit(
-        user.id,
-        novoLimite
+      user.id,
+      novoLimite
     );
 
     setLimiteGastos(limiteSalvo);
-}
+  }
 
   async function loadScheduledBills() {
     if (!user) return;
 
     try {
       const data = await getScheduledBills(user.id);
-
       setScheduledBills(data);
     } catch (error) {
-      console.error(
-        "ERRO AO CARREGAR CONTAS:",
-        error
-      );
+      console.error("ERRO AO CARREGAR CONTAS:", error);
     }
   }
 
   async function saveScheduledBill(bill) {
     if (bill.id) {
-      await updateScheduledBill(
-        bill.id,
-        {
-          nome: bill.nome,
-          categoria: bill.categoria,
-          valor: Number(bill.valor),
-          tipo: bill.tipo,
-          vencimento: bill.vencimento,
-          recorrencia: bill.recorrencia,
-          dias_lembrete: Number(bill.dias_lembrete),
-          ativo: bill.ativo,
-        }
-      );
+      await updateScheduledBill(bill.id, {
+        nome: bill.nome,
+        categoria: bill.categoria,
+        valor: Number(bill.valor),
+        tipo: bill.tipo,
+        vencimento: bill.vencimento,
+        recorrencia: bill.recorrencia,
+        dias_lembrete: Number(bill.dias_lembrete),
+        ativo: bill.ativo,
+      });
     } else {
       await createScheduledBill({
         nome: bill.nome,
@@ -244,27 +227,20 @@ async function handleSaveSpendingLimit(novoLimite) {
 
     try {
       await deleteScheduledBill(id);
-
       await loadScheduledBills();
     } catch (error) {
-      console.error(
-        "ERRO AO EXCLUIR CONTA:",
-        error
-      );
+      console.error("ERRO AO EXCLUIR CONTA:", error);
     }
   }
 
   async function saveGoal(goalData) {
     if (goalData.id) {
-      await updateGoal(
-        goalData.id,
-        {
-          nome: goalData.nome,
-          valor_meta: Number(goalData.valor_meta),
-          valor_inicial: Number(goalData.valor_inicial),
-          prazo_meses: Number(goalData.prazo_meses),
-        }
-      );
+      await updateGoal(goalData.id, {
+        nome: goalData.nome,
+        valor_meta: Number(goalData.valor_meta),
+        valor_inicial: Number(goalData.valor_inicial),
+        prazo_meses: Number(goalData.prazo_meses),
+      });
     } else {
       await createGoal({
         nome: goalData.nome,
@@ -281,38 +257,36 @@ async function handleSaveSpendingLimit(novoLimite) {
     setEditingGoal(null);
   }
 
+  // Verifica a sessão e acompanha o estado de autenticação.
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setUser(data.session?.user ?? null);
       setLoadingAuth(false);
     });
 
-    const {
-      data: listener,
-    } = supabase.auth.onAuthStateChange(
+    const { data: listener } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setUser(session?.user ?? null);
       }
     );
 
-    return () =>
-      listener.subscription.unsubscribe();
+    return () => listener.subscription.unsubscribe();
   }, []);
 
+  // Carrega os dados financeiros do usuário autenticado.
   useEffect(() => {
     if (user) {
-        loadTransactions();
-        loadLoans();
-        loadGoal();
-        loadScheduledBills();
-        loadUserSettings();
+      loadTransactions();
+      loadLoans();
+      loadGoal();
+      loadScheduledBills();
+      loadUserSettings();
     }
-}, [user]);
+  }, [user]);
 
   async function removeTransaction(id) {
     try {
       await deleteTransaction(id);
-
       await loadTransactions();
     } catch (err) {
       console.error(err);
@@ -328,17 +302,21 @@ async function handleSaveSpendingLimit(novoLimite) {
     filtro === "Todos"
       ? transactions
       : transactions.filter((item) => {
-          if (filtro === "Entradas")
+          if (filtro === "Entradas") {
             return item.tipo === "entrada";
+          }
 
-          if (filtro === "Saídas")
+          if (filtro === "Saídas") {
             return item.tipo === "saida";
+          }
 
-          if (filtro === "Investimentos")
+          if (filtro === "Investimentos") {
             return item.tipo === "investimento";
+          }
 
-          if (filtro === "Renda Passiva")
+          if (filtro === "Renda Passiva") {
             return item.tipo === "renda_passiva";
+          }
 
           return true;
         });
@@ -352,423 +330,427 @@ async function handleSaveSpendingLimit(novoLimite) {
   }
 
   const totalInvestimentos = transactions
-    .filter(
-      (item) => item.tipo === "investimento"
-    )
+    .filter((item) => item.tipo === "investimento")
     .reduce(
-      (total, item) =>
-        total + Number(item.valor),
+      (total, item) => total + Number(item.valor),
       0
     );
 
   const valorAtualMeta = goal
-    ? Number(goal.valor_inicial) +
-      totalInvestimentos
+    ? Number(goal.valor_inicial) + totalInvestimentos
     : 0;
 
   const percentualMeta = goal
     ? Math.min(
-        (valorAtualMeta /
-          Number(goal.valor_meta)) *
-          100,
+        (valorAtualMeta / Number(goal.valor_meta)) * 100,
         100
       )
     : 0;
 
   return (
     <>
-      <Header />
+      {/* CABEÇALHO: permanece visível nas duas telas */}
+      <Header
+        currentPage={currentPage}
+        onOpenProfile={() => setCurrentPage("profile")}
+        onGoHome={() => setCurrentPage("home")}
+      />
 
-      {/* Modal Nova Transação / Edição */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setEditingTransaction(null);
-        }}
-      >
-        <ModalWizard
-          user={user}
-          transactions={transactions}
-          setTransactions={setTransactions}
-          onClose={() => {
-            setIsModalOpen(false);
-            setEditingTransaction(null);
-            loadTransactions();
-          }}
-        />
-      </Modal>
-
-      {/* Modal Empréstimo */}
-      <Modal
-        isOpen={loanModalOpen}
-        onClose={() => {
-          setLoanModalOpen(false);
-          setEditingLoan(null);
-        }}
-      >
-        <LoanModal
-          loan={editingLoan}
-          onClose={() => {
-            setLoanModalOpen(false);
-            setEditingLoan(null);
-          }}
-          onSave={saveLoan}
-        />
-      </Modal>
-
-      {/* Modal Meta */}
-      <Modal
-        isOpen={goalModalOpen}
-        onClose={() => {
-          setGoalModalOpen(false);
-          setEditingGoal(null);
-        }}
-      >
-        <GoalModal
-          goal={editingGoal}
-          onClose={() => {
-            setGoalModalOpen(false);
-            setEditingGoal(null);
-          }}
-          onSave={saveGoal}
-        />
-      </Modal>
-
-      {/* Modal Contas Agendadas */}
-      <Modal
-        isOpen={scheduledBillModalOpen}
-        onClose={() => {
-          setScheduledBillModalOpen(false);
-          setEditingScheduledBill(null);
-        }}
-      >
-        <ScheduledBillModal
-          bill={editingScheduledBill}
-          onClose={() => {
-            setScheduledBillModalOpen(false);
-            setEditingScheduledBill(null);
-          }}
-          onSave={saveScheduledBill}
-        />
-      </Modal>
-
-      {/* Ações */}
-      <div className="actions">
-        <button
-          className="new-transaction-btn"
-          onClick={() => {
-            setEditingTransaction(null);
-            setIsModalOpen(true);
-          }}
-        >
-          ➕ Nova Transação
-        </button>
-      </div>
-
-      {/* Dashboard */}
-      <Home
-    transactions={filteredTransactions}
-    allTransactions={transactions}
-    loans={loans}
-    scheduledBills={scheduledBills}
-    goal={goal}
-    limiteGastos={limiteGastos}
-    onSalvarLimiteGastos={handleSaveSpendingLimit}
-/>
-
-      {/* Filtros */}
-      <div className="filter-toggle">
-        <button
-          onClick={() =>
-            setShowFilters(!showFilters)
-          }
-        >
-          {showFilters
-            ? "🔽 Esconder Filtros"
-            : "▶ Mostrar Filtros"}
-        </button>
-      </div>
-
-      {showFilters && (
-        <FilterBar
-          filtro={filtro}
-          setFiltro={setFiltro}
-        />
-      )}
-
-      {/* Transações + Painel lateral */}
-      <div className="transactions-container">
-
-        {/* Últimas Transações */}
-<div className="panel-card">
-  <div className="panel-header">
-    <h3>Últimas Transações</h3>
-
-    {filteredTransactions.length >= 2 && (
-      <button
-        className="loan-toggle"
-        onClick={() => setShowTransactions(!showTransactions)}
-        title={showTransactions ? "Recolher lista" : "Expandir lista"}
-      >
-        {showTransactions ? "Fechar" : "Abrir"}
-      </button>
-    )}
-  </div>
-
-  {(showTransactions || filteredTransactions.length < 2) && (
-    <TransactionList
-      transactions={filteredTransactions}
-      deleteTransaction={removeTransaction}
-      editTransaction={editTransaction}
-    />
-  )}
-</div>
-
-        <div className="side-panel">
-
-                {/* Empréstimos */}
-        <div className="panel-card">
-
-        <div className="panel-header">
-      <h3>Empréstimos</h3>
-
-      <div className="loan-actions">
-        <button
-          className="loan-add"
-          onClick={() => {
-            setEditingLoan(null);
-            setLoanModalOpen(true);
-          }}
-          title="Adicionar empréstimo"
-        >
-          +
-        </button>
-
-        {loans.length >= 2 && (
-          <button
-            className="loan-toggle"
-            onClick={() => setShowLoans(!showLoans)}
-            title={showLoans ? "Recolher lista" : "Expandir lista"}
+      {/* NAVEGAÇÃO: mostra o perfil ou o dashboard */}
+      {currentPage === "profile" ? (
+        <Profile />
+      ) : (
+        <>
+          {/* Modal Nova Transação / Edição */}
+          <Modal
+            isOpen={isModalOpen}
+            onClose={() => {
+              setIsModalOpen(false);
+              setEditingTransaction(null);
+            }}
           >
-            {showLoans ? "Fechar" : "Abrir"}
-          </button>
-        )}
-      </div>
-    </div>
-
-        {showLoans && (
-          loans.length === 0 ? (
-            <p>Nenhum empréstimo cadastrado.</p>
-          ) : (
-            <LoanList
-              loans={loans}
-              onDelete={removeLoan}
-              onPay={payLoan}
-              onEdit={(loan) => {
-                setEditingLoan(loan);
-                setLoanModalOpen(true);
+            <ModalWizard
+              user={user}
+              transactions={transactions}
+              setTransactions={setTransactions}
+              onClose={() => {
+                setIsModalOpen(false);
+                setEditingTransaction(null);
+                loadTransactions();
               }}
             />
-          )
-        )}
+          </Modal>
 
-        </div>
+          {/* Modal Empréstimo */}
+          <Modal
+            isOpen={loanModalOpen}
+            onClose={() => {
+              setLoanModalOpen(false);
+              setEditingLoan(null);
+            }}
+          >
+            <LoanModal
+              loan={editingLoan}
+              onClose={() => {
+                setLoanModalOpen(false);
+                setEditingLoan(null);
+              }}
+              onSave={saveLoan}
+            />
+          </Modal>
 
-          {/* Meta Mensal */}
-          <div className="panel-card">
+          {/* Modal Meta */}
+          <Modal
+            isOpen={goalModalOpen}
+            onClose={() => {
+              setGoalModalOpen(false);
+              setEditingGoal(null);
+            }}
+          >
+            <GoalModal
+              goal={editingGoal}
+              onClose={() => {
+                setGoalModalOpen(false);
+                setEditingGoal(null);
+              }}
+              onSave={saveGoal}
+            />
+          </Modal>
 
-            <div className="goal-header">
+          {/* Modal Contas Agendadas */}
+          <Modal
+            isOpen={scheduledBillModalOpen}
+            onClose={() => {
+              setScheduledBillModalOpen(false);
+              setEditingScheduledBill(null);
+            }}
+          >
+            <ScheduledBillModal
+              bill={editingScheduledBill}
+              onClose={() => {
+                setScheduledBillModalOpen(false);
+                setEditingScheduledBill(null);
+              }}
+              onSave={saveScheduledBill}
+            />
+          </Modal>
 
-              <h3>🎯 Meta Mensal</h3>
-
-              <button
-                className="goal-add"
-                onClick={() => {
-                  setEditingGoal(goal);
-                  setGoalModalOpen(true);
-                }}
-              >
-                ✏️
-              </button>
-
-            </div>
-
-            {goal ? (
-              <>
-                <p className="goal-name">
-                  <strong>
-                    {goal.nome}
-                  </strong>
-                </p>
-
-                <div className="goal-values">
-
-                  <strong className="goal-current">
-                    {valorAtualMeta.toLocaleString(
-                      "pt-BR",
-                      {
-                        style: "currency",
-                        currency: "BRL",
-                      }
-                    )}
-                  </strong>
-
-                  <span>
-                    /{" "}
-                    {Number(
-                      goal.valor_meta
-                    ).toLocaleString(
-                      "pt-BR",
-                      {
-                        style: "currency",
-                        currency: "BRL",
-                      }
-                    )}
-                  </span>
-
-                </div>
-
-                <div className="goal-percentage">
-                  {percentualMeta.toFixed(0)}%
-                </div>
-
-                <div className="goal-bar">
-
-                  <div
-                    className="goal-progress"
-                    style={{
-                      width: `${percentualMeta}%`,
-                    }}
-                  />
-
-                </div>
-
-                <p className="goal-status">
-
-                  {valorAtualMeta >=
-                  Number(goal.valor_meta)
-                    ? "🎉 Meta atingida!"
-                    : `Faltam ${(
-                        Number(
-                          goal.valor_meta
-                        ) -
-                        valorAtualMeta
-                      ).toLocaleString(
-                        "pt-BR",
-                        {
-                          style: "currency",
-                          currency: "BRL",
-                        }
-                      )}`}
-
-                </p>
-              </>
-            ) : (
-              <small>
-                Nenhuma meta cadastrada.
-              </small>
-            )}
-
+          {/* Ações */}
+          <div className="actions">
+            <button
+              className="new-transaction-btn"
+              onClick={() => {
+                setEditingTransaction(null);
+                setIsModalOpen(true);
+              }}
+            >
+              ➕ Nova Transação
+            </button>
           </div>
 
-          {/* Próximos Eventos */}
-          <div className="panel-card">
-          <div className="panel-header">
-  <h3>📅 Próximos Eventos</h3>
+          {/* Dashboard */}
+          <Home
+            transactions={filteredTransactions}
+            allTransactions={transactions}
+            loans={loans}
+            scheduledBills={scheduledBills}
+            goal={goal}
+            limiteGastos={limiteGastos}
+            onSalvarLimiteGastos={handleSaveSpendingLimit}
+          />
 
-  <div className="loan-actions">
-    <button
-      className="loan-add"
-      onClick={() => {
-        setEditingScheduledBill(null);
-        setScheduledBillModalOpen(true);
-      }}
-    >
-      +
-    </button>
+          {/* Filtros */}
+          <div className="filter-toggle">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              {showFilters
+                ? "🔽 Esconder Filtros"
+                : "▶ Mostrar Filtros"}
+            </button>
+          </div>
 
-    {scheduledBills.length >= 2 && (
-      <button
-        className="loan-toggle"
-        onClick={() => setShowScheduledBills(!showScheduledBills)}
-        title={showScheduledBills ? "Recolher lista" : "Expandir lista"}
-      >
-        {showScheduledBills ? "Fechar" : "Abrir"}
-      </button>
-    )}
-  </div>
-</div>
+          {showFilters && (
+            <FilterBar
+              filtro={filtro}
+              setFiltro={setFiltro}
+            />
+          )}
 
-{scheduledBills.length === 0 ? (
-  <p>Nenhuma conta agendada.</p>
-) : (
-  (showScheduledBills || scheduledBills.length < 2) && (
-    <div className="scheduled-bills-list">
-      {scheduledBills.map((bill) => {
-        const hoje = new Date();
+          {/* Transações + Painel lateral */}
+          <div className="transactions-container">
+            {/* Últimas Transações */}
+            <div className="panel-card">
+              <div className="panel-header">
+                <h3>Últimas Transações</h3>
 
-        const vencimento = new Date(`${bill.vencimento}T00:00:00`);
+                {filteredTransactions.length >= 2 && (
+                  <button
+                    className="loan-toggle"
+                    onClick={() =>
+                      setShowTransactions(!showTransactions)
+                    }
+                    title={
+                      showTransactions
+                        ? "Recolher lista"
+                        : "Expandir lista"
+                    }
+                  >
+                    {showTransactions ? "Fechar" : "Abrir"}
+                  </button>
+                )}
+              </div>
 
-        const diferenca = Math.ceil(
-          (vencimento - hoje) / (1000 * 60 * 60 * 24)
-        );
-
-        return (
-          <div className="scheduled-bill-item" key={bill.id}>
-            <div className="scheduled-bill-info">
-              <strong>{bill.nome}</strong>
-
-              <span>{bill.categoria}</span>
-
-              <small>
-                Vence em{" "}
-                {diferenca <= 0
-                  ? "hoje"
-                  : `${diferenca} dia${diferenca > 1 ? "s" : ""}`}
-              </small>
+              {(showTransactions ||
+                filteredTransactions.length < 2) && (
+                <TransactionList
+                  transactions={filteredTransactions}
+                  deleteTransaction={removeTransaction}
+                  editTransaction={editTransaction}
+                />
+              )}
             </div>
 
-            <div className="scheduled-bill-right">
-              <strong className="scheduled-bill-value">
-                {Number(bill.valor).toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                })}
-              </strong>
+            <div className="side-panel">
+              {/* Empréstimos */}
+              <div className="panel-card">
+                <div className="panel-header">
+                  <h3>Empréstimos</h3>
 
-              <div className="scheduled-bill-actions">
-                <button
-                  className="scheduled-bill-edit"
-                  onClick={() => {
-                    setEditingScheduledBill(bill);
-                    setScheduledBillModalOpen(true);
-                  }}
-                  title="Editar conta"
-                >
-                  ✏️
-                </button>
+                  <div className="loan-actions">
+                    <button
+                      className="loan-add"
+                      onClick={() => {
+                        setEditingLoan(null);
+                        setLoanModalOpen(true);
+                      }}
+                      title="Adicionar empréstimo"
+                    >
+                      +
+                    </button>
 
-                <button
-                  className="scheduled-bill-delete"
-                  onClick={() => removeScheduledBill(bill.id)}
-                  title="Excluir conta"
-                >
-                  🗑️
-                </button>
+                    {loans.length >= 2 && (
+                      <button
+                        className="loan-toggle"
+                        onClick={() => setShowLoans(!showLoans)}
+                        title={
+                          showLoans
+                            ? "Recolher lista"
+                            : "Expandir lista"
+                        }
+                      >
+                        {showLoans ? "Fechar" : "Abrir"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {showLoans &&
+                  (loans.length === 0 ? (
+                    <p>Nenhum empréstimo cadastrado.</p>
+                  ) : (
+                    <LoanList
+                      loans={loans}
+                      onDelete={removeLoan}
+                      onPay={payLoan}
+                      onEdit={(loan) => {
+                        setEditingLoan(loan);
+                        setLoanModalOpen(true);
+                      }}
+                    />
+                  ))}
+              </div>
+
+              {/* Meta Mensal */}
+              <div className="panel-card">
+                <div className="goal-header">
+                  <h3>🎯 Meta Mensal</h3>
+
+                  <button
+                    className="goal-add"
+                    onClick={() => {
+                      setEditingGoal(goal);
+                      setGoalModalOpen(true);
+                    }}
+                  >
+                    ✏️
+                  </button>
+                </div>
+
+                {goal ? (
+                  <>
+                    <p className="goal-name">
+                      <strong>{goal.nome}</strong>
+                    </p>
+
+                    <div className="goal-values">
+                      <strong className="goal-current">
+                        {valorAtualMeta.toLocaleString("pt-BR", {
+                          style: "currency",
+                          currency: "BRL",
+                        })}
+                      </strong>
+
+                      <span>
+                        {" / "}
+                        {Number(goal.valor_meta).toLocaleString(
+                          "pt-BR",
+                          {
+                            style: "currency",
+                            currency: "BRL",
+                          }
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="goal-percentage">
+                      {percentualMeta.toFixed(0)}%
+                    </div>
+
+                    <div className="goal-bar">
+                      <div
+                        className="goal-progress"
+                        style={{
+                          width: `${percentualMeta}%`,
+                        }}
+                      />
+                    </div>
+
+                    <p className="goal-status">
+                      {valorAtualMeta >= Number(goal.valor_meta)
+                        ? "🎉 Meta atingida!"
+                        : `Faltam ${(
+                            Number(goal.valor_meta) -
+                            valorAtualMeta
+                          ).toLocaleString("pt-BR", {
+                            style: "currency",
+                            currency: "BRL",
+                          })}`}
+                    </p>
+                  </>
+                ) : (
+                  <small>Nenhuma meta cadastrada.</small>
+                )}
+              </div>
+
+              {/* Próximos Eventos */}
+              <div className="panel-card">
+                <div className="panel-header">
+                  <h3>📅 Próximos Eventos</h3>
+
+                  <div className="loan-actions">
+                    <button
+                      className="loan-add"
+                      onClick={() => {
+                        setEditingScheduledBill(null);
+                        setScheduledBillModalOpen(true);
+                      }}
+                    >
+                      +
+                    </button>
+
+                    {scheduledBills.length >= 2 && (
+                      <button
+                        className="loan-toggle"
+                        onClick={() =>
+                          setShowScheduledBills(
+                            !showScheduledBills
+                          )
+                        }
+                        title={
+                          showScheduledBills
+                            ? "Recolher lista"
+                            : "Expandir lista"
+                        }
+                      >
+                        {showScheduledBills ? "Fechar" : "Abrir"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {scheduledBills.length === 0 ? (
+                  <p>Nenhuma conta agendada.</p>
+                ) : (
+                  (showScheduledBills ||
+                    scheduledBills.length < 2) && (
+                    <div className="scheduled-bills-list">
+                      {scheduledBills.map((bill) => {
+                        const hoje = new Date();
+
+                        const vencimento = new Date(
+                          `${bill.vencimento}T00:00:00`
+                        );
+
+                        const diferenca = Math.ceil(
+                          (vencimento - hoje) /
+                            (1000 * 60 * 60 * 24)
+                        );
+
+                        return (
+                          <div
+                            className="scheduled-bill-item"
+                            key={bill.id}
+                          >
+                            <div className="scheduled-bill-info">
+                              <strong>{bill.nome}</strong>
+                              <span>{bill.categoria}</span>
+
+                              <small>
+                                Vence em{" "}
+                                {diferenca <= 0
+                                  ? "hoje"
+                                  : `${diferenca} dia${
+                                      diferenca > 1 ? "s" : ""
+                                    }`}
+                              </small>
+                            </div>
+
+                            <div className="scheduled-bill-right">
+                              <strong className="scheduled-bill-value">
+                                {Number(bill.valor).toLocaleString(
+                                  "pt-BR",
+                                  {
+                                    style: "currency",
+                                    currency: "BRL",
+                                  }
+                                )}
+                              </strong>
+
+                              <div className="scheduled-bill-actions">
+                                <button
+                                  className="scheduled-bill-edit"
+                                  onClick={() => {
+                                    setEditingScheduledBill(bill);
+                                    setScheduledBillModalOpen(true);
+                                  }}
+                                  title="Editar conta"
+                                >
+                                  ✏️
+                                </button>
+
+                                <button
+                                  className="scheduled-bill-delete"
+                                  onClick={() =>
+                                    removeScheduledBill(bill.id)
+                                  }
+                                  title="Excluir conta"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )
+                )}
               </div>
             </div>
           </div>
-        );
-      })}
-    </div>
-  )
-)}
-
-          </div>
-
-        </div>
-      </div>
+        </>
+      )}
     </>
   );
 }

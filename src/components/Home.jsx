@@ -29,6 +29,7 @@ function Home({
           allTransactions={allTransactions}
           loans={loans}
           scheduledBills={scheduledBills}
+          limiteGastos={limiteGastos}
         />
       </div>
     </section>

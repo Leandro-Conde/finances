@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   AreaChart,
@@ -25,6 +25,26 @@ function formatLocalDate(date) {
   return `${year}-${month}-${day}`;
 }
 
+function getDiasAteVirarOMes() {
+  const hoje = new Date();
+
+  const inicioProximoMes = new Date(
+    hoje.getFullYear(),
+    hoje.getMonth() + 1,
+    1
+  );
+
+  const hojeSemHorario = new Date(
+    hoje.getFullYear(),
+    hoje.getMonth(),
+    hoje.getDate()
+  );
+
+  return Math.round(
+    (inicioProximoMes - hojeSemHorario) / (1000 * 60 * 60 * 24)
+  );
+}
+
 function getDateThreeMonthsAgo() {
   const today = new Date();
   const date = new Date(today);
@@ -48,16 +68,55 @@ function FinanceChart({
   allTransactions = [],
   loans = [],
   scheduledBills = [],
+  limiteGastos = 3000,
 }) {
   const [mode, setMode] = useState("diario");
   const [direction, setDirection] = useState("esquerda");
   const [inverted, setInverted] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
   const [showProjection, setShowProjection] = useState(true);
+  const [alertaTetoAtivo, setAlertaTetoAtivo] = useState(false);
+
+  const diasRestantes = getDiasAteVirarOMes();
 
   const today = new Date();
   const todayISO = formatLocalDate(today);
-  const threeMonthsAgoISO = formatLocalDate(getDateThreeMonthsAgo());
+  const mesAtual = todayISO.slice(0, 7);
+  const tresMesesAtrasISO = formatLocalDate(getDateThreeMonthsAgo());
+
+  const limiteNumerico = Number(limiteGastos) || 0;
+
+  // Soma as despesas reais do mês atual.
+  const gastosMesAtual = allTransactions
+    .filter((item) => {
+      if (item.tipo !== "saida" || !item.data) return false;
+
+      return String(item.data).slice(0, 7) === mesAtual;
+    })
+    .reduce((total, item) => {
+      return total + Number(item.valor || 0);
+    }, 0);
+
+  // Ativa o alerta quando os gastos ultrapassam o limite.
+  // Desativa quando o limite passa a cobrir os gastos.
+  useEffect(() => {
+    const chaveAlerta = `atlasFinanceTetoUltrapassado-${mesAtual}`;
+    const tetoUltrapassado =
+      limiteNumerico > 0 && gastosMesAtual > limiteNumerico;
+
+    try {
+      if (tetoUltrapassado) {
+        localStorage.setItem(chaveAlerta, "true");
+        setAlertaTetoAtivo(true);
+      } else {
+        localStorage.removeItem(chaveAlerta);
+        setAlertaTetoAtivo(false);
+      }
+    } catch (error) {
+      console.error("Não foi possível atualizar o alerta:", error);
+      setAlertaTetoAtivo(tetoUltrapassado);
+    }
+  }, [mesAtual, gastosMesAtual, limiteNumerico]);
 
   const historicalData = processChartData(transactions, mode);
 
@@ -65,13 +124,12 @@ function FinanceChart({
     ? historicalData
     : historicalData.filter((item) => {
         if (mode === "mensal") {
-          const startMonth = threeMonthsAgoISO.slice(0, 7);
-          const currentMonth = todayISO.slice(0, 7);
+          const inicioMes = tresMesesAtrasISO.slice(0, 7);
 
-          return item.data >= startMonth && item.data <= currentMonth;
+          return item.data >= inicioMes && item.data <= mesAtual;
         }
 
-        return item.data >= threeMonthsAgoISO && item.data <= todayISO;
+        return item.data >= tresMesesAtrasISO && item.data <= todayISO;
       });
 
   const projection = processProjectedBalance({
@@ -97,7 +155,7 @@ function FinanceChart({
     <div
       style={{
         width: "100%",
-        height: 420,
+        height: 500,
         marginTop: 10,
         background: "#18181b",
         borderRadius: 20,
@@ -108,7 +166,37 @@ function FinanceChart({
         minHeight: 0,
       }}
     >
-      {/* Cabeçalho */}
+      <style>
+        {`
+          @keyframes alertaTetoBrilho {
+            0%, 100% {
+              filter:
+                drop-shadow(0 0 3px #ff0000)
+                drop-shadow(0 0 7px #ff0000);
+              opacity: 1;
+            }
+
+            50% {
+              filter:
+                drop-shadow(0 0 7px #ff0000)
+                drop-shadow(0 0 16px #ff2222);
+              opacity: 0.75;
+            }
+          }
+
+          @keyframes alertaTetoPulso {
+            0%, 100% {
+              box-shadow: 0 0 8px #ef444455;
+            }
+
+            50% {
+              box-shadow: 0 0 22px #ef4444aa;
+            }
+          }
+        `}
+      </style>
+
+      {/* Cabeçalho e controles principais */}
       <div
         style={{
           display: "flex",
@@ -122,13 +210,7 @@ function FinanceChart({
       >
         <h2 style={{ margin: 0 }}>Evolução Financeira</h2>
 
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            flexWrap: "wrap",
-          }}
-        >
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
             onClick={() => setShowProjection((current) => !current)}
             title="Ativar ou desativar a previsão de saldo"
@@ -244,8 +326,7 @@ function FinanceChart({
               )
             }
             style={{
-              background:
-                direction === "direita" ? "#7c3aed" : "transparent",
+              background: direction === "direita" ? "#7c3aed" : "transparent",
               color: "#ffffff",
               border: "none",
               borderRadius: 7,
@@ -274,7 +355,7 @@ function FinanceChart({
         </div>
       )}
 
-      {/* Gráfico: ocupa todo o espaço restante do painel */}
+      {/* Área do gráfico */}
       <div
         style={{
           flex: "1 1 0",
@@ -339,9 +420,14 @@ function FinanceChart({
               type="monotone"
               dataKey="saida"
               name="Saídas"
-              stroke="#ef4444"
-              fill="#ef444433"
-              strokeWidth={3}
+              stroke={alertaTetoAtivo ? "#ff0000" : "#ef4444"}
+              fill={alertaTetoAtivo ? "#ff000033" : "#ef444433"}
+              strokeWidth={alertaTetoAtivo ? 5 : 3}
+              style={
+                alertaTetoAtivo
+                  ? { animation: "alertaTetoBrilho 1.2s ease-in-out infinite" }
+                  : undefined
+              }
               animationDuration={900}
             />
 
@@ -376,6 +462,45 @@ function FinanceChart({
           </AreaChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Alerta de teto abaixo do gráfico */}
+      {alertaTetoAtivo && (
+        <div
+          role="alert"
+          style={{
+            background: "#450a0a",
+            border: "1px solid #ef4444",
+            color: "#fecaca",
+            borderRadius: 10,
+            padding: "10px 14px",
+            marginTop: 12,
+            fontSize: 13,
+            fontWeight: 700,
+            animation: "alertaTetoPulso 1.5s ease-in-out infinite",
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ fontSize: 15, marginBottom: 5 }}>
+            🚨 TETO DE GASTOS ULTRAPASSADO!
+          </div>
+
+          <div>
+            Gastos do mês: {formatCurrency(gastosMesAtual)}
+            {" · "}
+            Limite: {formatCurrency(limiteNumerico)}
+          </div>
+
+          <div style={{ marginTop: 5, fontWeight: 500 }}>
+            {diasRestantes === 0
+              ? "O mês termina hoje. O alerta será atualizado na virada do mês."
+              : `Faltam ${diasRestantes} ${
+                  diasRestantes === 1 ? "dia" : "dias"
+                } para virar o mês.`}{" "}
+            O alerta será encerrado automaticamente na virada do mês,
+            ou antes, se você aumentar o limite para cobrir seus gastos.
+          </div>
+        </div>
+      )}
     </div>
   );
 }
