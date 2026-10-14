@@ -74,7 +74,7 @@ function FinanceChart({
   const [direction, setDirection] = useState("esquerda");
   const [inverted, setInverted] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
-  const [showProjection, setShowProjection] = useState(true);
+  const [showProjection, setShowProjection] = useState(false);
   const [alertaTetoAtivo, setAlertaTetoAtivo] = useState(false);
 
   const diasRestantes = getDiasAteVirarOMes();
