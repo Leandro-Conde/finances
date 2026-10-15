@@ -14,15 +14,21 @@ function Header({ onOpenProfile, onGoHome, currentPage = "home" }) {
 
   return (
     <header className="header">
-      <button
-        className="header-brand"
-        type="button"
-        onClick={onGoHome}
-        aria-label="Voltar ao Atlas Finance"
-      >
-        <Logo variant="atlas" size={42} />
-        <h2>Atlas Finance</h2>
-      </button>
+     
+<button
+  className="header-brand"
+  type="button"
+  onClick={onGoHome}
+  aria-label="Voltar ao Atlas Finance"
+>
+  <img
+    src="/atlas-logo.png"
+    alt=""
+    className="header-logo"
+  />
+  <h2>Atlas Finance</h2>
+</button>
+
 
       <div className="header-actions">
         <button
