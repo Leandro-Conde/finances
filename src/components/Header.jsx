@@ -1,7 +1,6 @@
 
 import { supabase } from "../services/supabase";
 import "../styles/header.css";
-import Logo from "./common/Logo";
 
 function Header({ onOpenProfile, onGoHome, currentPage = "home" }) {
   async function logout() {
@@ -14,21 +13,19 @@ function Header({ onOpenProfile, onGoHome, currentPage = "home" }) {
 
   return (
     <header className="header">
-     
-<button
-  className="header-brand"
-  type="button"
-  onClick={onGoHome}
-  aria-label="Voltar ao Atlas Finance"
->
-  <img
-    src="/atlas-logo.png"
-    alt=""
-    className="header-logo"
-  />
-  <h2>Atlas Finance</h2>
-</button>
-
+      <button
+        className="header-brand"
+        type="button"
+        onClick={onGoHome}
+        aria-label="Voltar ao Atlas Finance"
+      >
+        <img    
+          src={`${import.meta.env.BASE_URL}atlas-logo.png`}
+          alt="Logo Atlas Finance"
+          className="header-logo"
+        />
+        <h2>Atlas Finance</h2>
+      </button>
 
       <div className="header-actions">
         <button

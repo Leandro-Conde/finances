@@ -132,26 +132,30 @@
   }
   
 
+
+  .header-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+  
+  .header-brand h2 {
+    margin: 0;
+    font-size: 1.2rem;
+  }
+  
   
 .header-logo {
-  width: 42px;
-  height: 42px;
+  display: block;
+  width: 64px;
+  height: 64px;
   object-fit: contain;
   flex-shrink: 0;
 }
 
-.header-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-
-.header-brand h2 {
-  margin: 0;
-  font-size: 1.2rem;
-}
+  

@@ -60,3 +60,72 @@ export async function createTransactions(transactions) {
   return data;
 
 }
+
+
+/**
+ * Conta as transações que seriam removidas.
+ * meses = 1, 2, 3... para limpar o histórico antigo.
+ * meses = "todos" para contar todas as transações.
+ */
+export async function countTransactionsToClean(userId, meses) {
+    if (!userId) {
+      throw new Error("Usuário não autenticado.");
+    }
+  
+    let query = supabase
+      .from("transactions")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId);
+  
+    if (meses !== "todos") {
+      const dataLimite = new Date();
+      dataLimite.setMonth(dataLimite.getMonth() - Number(meses));
+  
+      const dataISO = [
+        dataLimite.getFullYear(),
+        String(dataLimite.getMonth() + 1).padStart(2, "0"),
+        String(dataLimite.getDate()).padStart(2, "0"),
+      ].join("-");
+  
+      query = query.lt("data", dataISO);
+    }
+  
+    const { count, error } = await query;
+  
+    if (error) throw error;
+  
+    return count ?? 0;
+  }
+  
+  /**
+   * Exclui transações antigas ou todo o histórico
+   * apenas do usuário informado.
+   */
+  export async function cleanTransactionHistory(userId, meses) {
+    if (!userId) {
+      throw new Error("Usuário não autenticado.");
+    }
+  
+    let query = supabase
+      .from("transactions")
+      .delete()
+      .eq("user_id", userId);
+  
+    if (meses !== "todos") {
+      const dataLimite = new Date();
+      dataLimite.setMonth(dataLimite.getMonth() - Number(meses));
+  
+      const dataISO = [
+        dataLimite.getFullYear(),
+        String(dataLimite.getMonth() + 1).padStart(2, "0"),
+        String(dataLimite.getDate()).padStart(2, "0"),
+      ].join("-");
+  
+      query = query.lt("data", dataISO);
+    }
+  
+    const { error } = await query;
+  
+    if (error) throw error;
+  }
+  

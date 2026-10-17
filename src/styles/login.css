@@ -104,17 +104,17 @@
     overflow: hidden;
   }
   
-  .login-page::before {
+ 
+.login-page::before {
     content: "";
     position: absolute;
     z-index: -1;
-    top: 50%;
-    left: 50%;
-    width: min(650px, 85vw);
-    aspect-ratio: 1;
-    transform: translate(-50%, -50%);
-    background: url("/atlas-logo-full.png") center / contain no-repeat;
-    opacity: 0.14;
+    inset: 0;
+    background-image: url("/atlas-logo-full.png");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    opacity: 0.18;
     pointer-events: none;
   }
   
