@@ -31,6 +31,7 @@ import {
   deleteTransaction,
   getPreservedFinancialBalances,
   cleanTransactionHistory,
+  countTransactionsToClean,
 } from "./services/transactionService";
 
 import {
@@ -61,6 +62,11 @@ function App() {
   const [cleaningHistory, setCleaningHistory] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState(null);
+
+  const [cleanupPeriod, setCleanupPeriod] = useState("3");
+  const [cleanupCount, setCleanupCount] = useState(null);
+  const [countingCleanup, setCountingCleanup] = useState(false);
+  const [cleanupCountError, setCleanupCountError] = useState("");
 
   const [showFilters, setShowFilters] = useState(false);
   const [filtro, setFiltro] = useState("Todos");
@@ -137,28 +143,86 @@ function App() {
   }
 
   
-async function loadTransactions() {
-  if (!user) return;
 
-  setFinancialDataLoaded(false);
-
-  try {
-    const [transactionsData, balances] = await Promise.all([
-      getTransactions(user.id),
-      getPreservedFinancialBalances(user.id),
-    ]);
-
-    setTransactions(transactionsData);
-    setSaldoBase(balances.saldoBase);
-    setInvestimentosBase(balances.investimentosBase);
-  } catch (error) {
-    console.error("Erro ao carregar dados financeiros:", error);
-    throw error;
-  } finally {
-    setFinancialDataLoaded(true);
+  async function loadTransactions() {
+    if (!user) return false;
+  
+    setFinancialDataLoaded(false);
+  
+    try {
+      const [transactionsData, balances] = await Promise.all([
+        getTransactions(user.id),
+        getPreservedFinancialBalances(user.id),
+      ]);
+  
+      setTransactions(transactionsData);
+      setSaldoBase(balances.saldoBase);
+      setInvestimentosBase(balances.investimentosBase);
+  
+      setFinancialDataLoaded(true);
+      return true;
+    } catch (error) {
+      console.error("Erro ao carregar dados financeiros:", error);
+  
+      window.alert(
+        "Não foi possível carregar seus dados financeiros. Verifique sua conexão e tente novamente."
+      );
+  
+      return false;
+    }
   }
-}
+  
 
+  useEffect(() => {
+    if (!user || !financialDataLoaded || cleaningHistory) {
+      setCleanupCount(null);
+      return;
+    }
+  
+    let cancelled = false;
+  
+    async function updateCleanupCount() {
+      setCountingCleanup(true);
+      setCleanupCount(null);
+      setCleanupCountError("");
+  
+      try {
+        const count = await countTransactionsToClean(
+          user.id,
+          cleanupPeriod === "todos"
+            ? "todos"
+            : Number(cleanupPeriod)
+        );
+  
+        if (!cancelled) {
+          setCleanupCount(count);
+        }
+      } catch (error) {
+        console.error("Erro ao contar transações:", error);
+  
+        if (!cancelled) {
+          setCleanupCountError(
+            "Não foi possível calcular a quantidade. Tente novamente."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setCountingCleanup(false);
+        }
+      }
+    }
+  
+    updateCleanupCount();
+  
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    user?.id,
+    financialDataLoaded,
+    cleanupPeriod,
+    cleaningHistory,
+  ]);
 
   async function loadLoans() {
     if (!user) return;
@@ -316,17 +380,27 @@ async function loadTransactions() {
 
   async function handleCleanTransactionHistory(months = null) {
     if (!user) {
-      throw new Error("Usuário não autenticado.");
+      window.alert("Você precisa estar autenticado.");
+      return;
     }
   
     if (cleaningHistory || !financialDataLoaded) {
+      window.alert("Aguarde o carregamento dos dados financeiros.");
+      return;
+    }
+  
+    if (
+      months !== null &&
+      (!Number.isInteger(months) || months < 1)
+    ) {
+      window.alert("Selecione um período válido.");
       return;
     }
   
     const confirmation =
       months === null
-        ? "Todo o histórico de transações será apagado. O saldo atual e os investimentos acumulados serão preservados. Deseja continuar?"
-        : `As transações anteriores a ${months} meses atrás serão apagadas. O saldo atual e os investimentos acumulados serão preservados. Deseja continuar?`;
+        ? "Todo o histórico será apagado. O saldo e os investimentos acumulados serão preservados. Deseja continuar?"
+        : `Serão apagadas as transações anteriores ao limite de ${months} mês(es). O saldo e os investimentos acumulados serão preservados. Deseja continuar?`;
   
     if (!window.confirm(confirmation)) return;
   
@@ -335,12 +409,20 @@ async function loadTransactions() {
     try {
       const result = await cleanTransactionHistory(months);
   
-      // Recarrega o histórico e os valores preservados.
-      await loadTransactions();
+      // A exclusão já ocorreu no banco. Agora atualizamos a tela.
+      const transactionsReloaded = await loadTransactions();
+  
       await loadGoal();
   
+      if (!transactionsReloaded) {
+        window.alert(
+          `A limpeza foi executada: ${result?.deleted_count ?? 0} transação(ões) removida(s). Porém, não foi possível atualizar os dados na tela. Recarregue o aplicativo.`
+        );
+        return result;
+      }
+  
       window.alert(
-        `Limpeza concluída. ${result?.deleted_count ?? 0} transação(ões) removida(s).`
+        `Limpeza concluída! ${result?.deleted_count ?? 0} transação(ões) removida(s).`
       );
   
       return result;
@@ -348,10 +430,10 @@ async function loadTransactions() {
       console.error("Erro ao limpar histórico:", error);
   
       window.alert(
-        "Não foi possível limpar o histórico. Nenhuma confirmação de sucesso foi recebida."
+        "Não foi possível confirmar a limpeza. Confira os dados no Supabase antes de tentar novamente."
       );
   
-      throw error;
+      return null;
     } finally {
       setCleaningHistory(false);
     }
@@ -512,6 +594,74 @@ async function loadTransactions() {
             >
               ➕ Nova Transação
             </button>
+
+            <details className="history-cleanup panel-card">
+  <summary className="history-cleanup-summary">
+    <span>🗂️ Gerenciar histórico</span>
+    <span className="history-cleanup-arrow">⌄</span>
+  </summary>
+
+  <div className="history-cleanup-content">
+    <p>
+      Remova transações antigas sem perder o saldo e os investimentos
+      acumulados.
+    </p>
+
+    <label htmlFor="cleanup-period">
+      Período do histórico
+    </label>
+
+    <select
+      id="cleanup-period"
+      value={cleanupPeriod}
+      onChange={(event) => setCleanupPeriod(event.target.value)}
+      disabled={cleaningHistory || countingCleanup}
+    >
+      <option value="1">Mais de 1 mês</option>
+      <option value="3">Mais de 3 meses</option>
+      <option value="6">Mais de 6 meses</option>
+      <option value="12">Mais de 12 meses</option>
+      <option value="todos">Todo o histórico</option>
+    </select>
+
+    <p aria-live="polite">
+      {countingCleanup
+        ? "Calculando transações..."
+        : cleanupCountError
+          ? cleanupCountError
+          : cleanupCount === null
+            ? "Aguardando dados financeiros..."
+            : `${cleanupCount} transação(ões) serão removidas.`}
+    </p>
+
+    <button
+      type="button"
+      className="history-cleanup-btn"
+      disabled={
+        cleaningHistory ||
+        countingCleanup ||
+        !financialDataLoaded ||
+        cleanupCount === null ||
+        cleanupCountError !== "" ||
+        cleanupCount === 0
+      }
+      onClick={() =>
+        handleCleanTransactionHistory(
+          cleanupPeriod === "todos"
+            ? null
+            : Number(cleanupPeriod)
+        )
+      }
+    >
+      {cleaningHistory ? "Limpando..." : "Limpar histórico"}
+    </button>
+
+    <small>
+      A operação não pode ser desfeita pela interface. Confira a
+      seleção antes de confirmar.
+    </small>
+  </div>
+</details>
           </div>
 
           {/* Dashboard */}
