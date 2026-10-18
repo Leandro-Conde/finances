@@ -29,6 +29,8 @@ import {
 import {
   getTransactions,
   deleteTransaction,
+  getPreservedFinancialBalances,
+  cleanTransactionHistory,
 } from "./services/transactionService";
 
 import {
@@ -53,6 +55,10 @@ import { supabase } from "./services/supabase";
 
 function App() {
   const [transactions, setTransactions] = useState([]);
+  const [saldoBase, setSaldoBase] = useState(0);
+  const [investimentosBase, setInvestimentosBase] = useState(0);
+  const [financialDataLoaded, setFinancialDataLoaded] = useState(false);
+  const [cleaningHistory, setCleaningHistory] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState(null);
 
@@ -130,16 +136,29 @@ function App() {
     setLoanModalOpen(false);
   }
 
-  async function loadTransactions() {
-    if (!user) return;
+  
+async function loadTransactions() {
+  if (!user) return;
 
-    try {
-      const data = await getTransactions(user.id);
-      setTransactions(data);
-    } catch (err) {
-      console.error(err);
-    }
+  setFinancialDataLoaded(false);
+
+  try {
+    const [transactionsData, balances] = await Promise.all([
+      getTransactions(user.id),
+      getPreservedFinancialBalances(user.id),
+    ]);
+
+    setTransactions(transactionsData);
+    setSaldoBase(balances.saldoBase);
+    setInvestimentosBase(balances.investimentosBase);
+  } catch (error) {
+    console.error("Erro ao carregar dados financeiros:", error);
+    throw error;
+  } finally {
+    setFinancialDataLoaded(true);
   }
+}
+
 
   async function loadLoans() {
     if (!user) return;
@@ -293,6 +312,53 @@ function App() {
     }
   }
 
+  
+
+  async function handleCleanTransactionHistory(months = null) {
+    if (!user) {
+      throw new Error("Usuário não autenticado.");
+    }
+  
+    if (cleaningHistory || !financialDataLoaded) {
+      return;
+    }
+  
+    const confirmation =
+      months === null
+        ? "Todo o histórico de transações será apagado. O saldo atual e os investimentos acumulados serão preservados. Deseja continuar?"
+        : `As transações anteriores a ${months} meses atrás serão apagadas. O saldo atual e os investimentos acumulados serão preservados. Deseja continuar?`;
+  
+    if (!window.confirm(confirmation)) return;
+  
+    setCleaningHistory(true);
+  
+    try {
+      const result = await cleanTransactionHistory(months);
+  
+      // Recarrega o histórico e os valores preservados.
+      await loadTransactions();
+      await loadGoal();
+  
+      window.alert(
+        `Limpeza concluída. ${result?.deleted_count ?? 0} transação(ões) removida(s).`
+      );
+  
+      return result;
+    } catch (error) {
+      console.error("Erro ao limpar histórico:", error);
+  
+      window.alert(
+        "Não foi possível limpar o histórico. Nenhuma confirmação de sucesso foi recebida."
+      );
+  
+      throw error;
+    } finally {
+      setCleaningHistory(false);
+    }
+  }
+  
+
+
   function editTransaction(transaction) {
     setEditingTransaction(transaction);
     setIsModalOpen(true);
@@ -329,12 +395,12 @@ function App() {
     return <Login />;
   }
 
-  const totalInvestimentos = transactions
-    .filter((item) => item.tipo === "investimento")
-    .reduce(
-      (total, item) => total + Number(item.valor),
-      0
-    );
+  const totalInvestimentos = investimentosBase + transactions
+  .filter((item) => item.tipo === "investimento")
+  .reduce(
+    (total, item) => total + Number(item.valor || 0),
+    0
+  );
 
   const valorAtualMeta = goal
     ? Number(goal.valor_inicial) + totalInvestimentos
@@ -450,14 +516,17 @@ function App() {
 
           {/* Dashboard */}
           <Home
-            transactions={filteredTransactions}
-            allTransactions={transactions}
-            loans={loans}
-            scheduledBills={scheduledBills}
-            goal={goal}
-            limiteGastos={limiteGastos}
-            onSalvarLimiteGastos={handleSaveSpendingLimit}
-          />
+        transactions={filteredTransactions}
+        allTransactions={transactions}
+        loans={loans}
+        scheduledBills={scheduledBills}
+        goal={goal}
+        limiteGastos={limiteGastos}
+        onSalvarLimiteGastos={handleSaveSpendingLimit}
+        saldoBase={saldoBase}
+        investimentosBase={investimentosBase}
+        financialDataLoaded={financialDataLoaded}
+      />
 
           {/* Filtros */}
           <div className="filter-toggle">

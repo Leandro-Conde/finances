@@ -129,3 +129,34 @@ export async function countTransactionsToClean(userId, meses) {
     if (error) throw error;
   }
   
+
+  
+export async function getPreservedFinancialBalances(userId) {
+  const { data, error } = await supabase
+      .from("user_financial_balances")
+      .select("saldo_base, investimentos_base")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+  if (error) throw error;
+
+  return {
+      saldoBase: Number(data?.saldo_base ?? 0),
+      investimentosBase: Number(data?.investimentos_base ?? 0),
+  };
+}
+
+export async function cleanTransactionHistory(months = null) {
+  if (months !== null && (!Number.isInteger(months) || months < 1)) {
+      throw new Error("O período deve ser de pelo menos 1 mês.");
+  }
+
+  const { data, error } = await supabase.rpc(
+      "clean_transaction_history",
+      { p_months: months }
+  );
+
+  if (error) throw error;
+
+  return data?.[0] ?? null;
+}

@@ -9,6 +9,9 @@ function Dashboard({
     goal,
     limiteGastos = 3000,
     onSalvarLimiteGastos,
+    saldoBase = 0,
+    investimentosBase = 0,
+    financialDataLoaded = false,
 }) {
     const [modalAberto, setModalAberto] = useState(false);
     const [novoLimite, setNovoLimite] = useState(String(limiteGastos));
@@ -27,7 +30,12 @@ function Dashboard({
         economia,
         tetoGastos,
         percentualGasto,
-    } = calculateDashboardMetrics(transactions, limiteGastos);
+    } = calculateDashboardMetrics(
+        transactions,
+        limiteGastos,
+        saldoBase,
+        investimentosBase
+    );
 
     const insights = getDashboardInsights(transactions);
 
@@ -70,6 +78,17 @@ function Dashboard({
             console.error("Erro ao salvar limite de gastos:", error);
             setErro("Não foi possível salvar. Tente novamente.");
         }
+    }
+
+    if (!financialDataLoaded) {
+        return (
+            <section className="dashboard">
+                <div className="saldo-card">
+                    <h2>Saldo Atual</h2>
+                    <p>Carregando dados financeiros...</p>
+                </div>
+            </section>
+        );
     }
 
     return (
@@ -227,7 +246,9 @@ function Dashboard({
                             step="0.01"
                             required
                             value={novoLimite}
-                            onChange={(event) => setNovoLimite(event.target.value)}
+                            onChange={(event) =>
+                                setNovoLimite(event.target.value)
+                            }
                             style={{
                                 width: "100%",
                                 padding: 12,
