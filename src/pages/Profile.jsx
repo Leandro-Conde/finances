@@ -5,6 +5,7 @@ import "../styles/profile.css";
 
 const AVATAR_BUCKET = "avatars";
 const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
+const SIGNED_URL_SECONDS = 60 * 60;
 
 function Profile() {
   const fileInputRef = useRef(null);
@@ -12,6 +13,7 @@ function Profile() {
   const [user, setUser] = useState(null);
   const [nome, setNome] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarPath, setAvatarPath] = useState("");
   const [tema, setTema] = useState("dark");
   const [idioma, setIdioma] = useState("pt-BR");
   const [loading, setLoading] = useState(true);
@@ -21,41 +23,88 @@ function Profile() {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadProfile() {
-      const { data, error } = await supabase.auth.getUser();
-
-      if (error || !data.user) {
-        setErrorMessage("Não foi possível carregar sua conta.");
-        setLoading(false);
-        return;
-      }
-
-      const currentUser = data.user;
-      const metadata = currentUser.user_metadata || {};
-
-      setUser(currentUser);
-      setNome(metadata.full_name || metadata.name || "");
-      setAvatarUrl(metadata.avatar_url || "");
-
       try {
-        const savedTheme = localStorage.getItem("atlas-theme");
-        const savedLanguage = localStorage.getItem("atlas-language");
+        const { data, error } = await supabase.auth.getUser();
 
-        if (["dark", "light", "system"].includes(savedTheme)) {
-          setTema(savedTheme);
+        if (error) throw error;
+
+        if (!data.user) {
+          if (!cancelled) {
+            setErrorMessage("Não foi possível carregar sua conta.");
+          }
+          return;
         }
 
-        if (["pt-BR", "en", "es"].includes(savedLanguage)) {
-          setIdioma(savedLanguage);
+        const currentUser = data.user;
+        const metadata = currentUser.user_metadata || {};
+        const savedPath = metadata.avatar_path || "";
+
+        let signedUrl = "";
+
+        if (savedPath) {
+          const { data: signedData, error: signedError } =
+            await supabase.storage
+              .from(AVATAR_BUCKET)
+              .createSignedUrl(savedPath, SIGNED_URL_SECONDS);
+
+          if (!signedError) {
+            signedUrl = signedData?.signedUrl || "";
+          } else {
+            console.error(
+              "Não foi possível carregar a foto:",
+              signedError.message
+            );
+          }
+        } else if (metadata.avatar_url) {
+          // Compatibilidade com perfis antigos que usam URL pública.
+          signedUrl = metadata.avatar_url;
         }
-      } catch {
-        // As preferências continuam disponíveis durante a sessão.
+
+        let savedTheme = "dark";
+        let savedLanguage = "pt-BR";
+
+        try {
+          const storedTheme = localStorage.getItem("atlas-theme");
+          const storedLanguage = localStorage.getItem("atlas-language");
+
+          if (["dark", "light", "system"].includes(storedTheme)) {
+            savedTheme = storedTheme;
+          }
+
+          if (["pt-BR", "en", "es"].includes(storedLanguage)) {
+            savedLanguage = storedLanguage;
+          }
+        } catch {
+          // As preferências padrão continuam disponíveis.
+        }
+
+        if (cancelled) return;
+
+        setUser(currentUser);
+        setNome(metadata.full_name || metadata.name || "");
+        setAvatarPath(savedPath);
+        setAvatarUrl(signedUrl);
+        setTema(savedTheme);
+        setIdioma(savedLanguage);
+      } catch (error) {
+        if (!cancelled) {
+          setErrorMessage(
+            error.message || "Não foi possível carregar sua conta."
+          );
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-
-      setLoading(false);
     }
 
     loadProfile();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function clearMessages() {
@@ -76,23 +125,28 @@ function Profile() {
 
     setSaving(true);
 
-    const { data, error } = await supabase.auth.updateUser({
-      data: {
-        ...user.user_metadata,
-        full_name: nome.trim(),
-        avatar_url: avatarUrl || null,
-      },
-    });
+    try {
+      const { data, error } = await supabase.auth.updateUser({
+        data: {
+          ...user.user_metadata,
+          full_name: nome.trim(),
+          avatar_path: avatarPath || null,
+          // Não gravamos a URL assinada: ela expira.
+          avatar_url: null,
+        },
+      });
 
-    setSaving(false);
+      if (error) throw error;
 
-    if (error) {
-      setErrorMessage(`Não foi possível salvar: ${error.message}`);
-      return;
+      setUser(data.user);
+      setMessage("Informações do perfil salvas com sucesso.");
+    } catch (error) {
+      setErrorMessage(
+        `Não foi possível salvar: ${error.message}`
+      );
+    } finally {
+      setSaving(false);
     }
-
-    setUser(data.user);
-    setMessage("Informações do perfil salvas com sucesso.");
   }
 
   async function uploadAvatar(event) {
@@ -104,7 +158,11 @@ function Profile() {
 
     clearMessages();
 
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
 
     if (!allowedTypes.includes(file.type)) {
       setErrorMessage("Selecione uma imagem JPG, PNG ou WEBP.");
@@ -118,43 +176,46 @@ function Profile() {
 
     setUploading(true);
 
-    try {
-      const extension = file.name.split(".").pop()?.toLowerCase() || "png";
-      const filePath = `${user.id}/avatar-${Date.now()}.${extension}`;
+    const filePath = `${user.id}/avatar`;
 
+    try {
       const { error: uploadError } = await supabase.storage
         .from(AVATAR_BUCKET)
         .upload(filePath, file, {
           upsert: true,
           contentType: file.type,
+          cacheControl: "3600",
         });
 
       if (uploadError) throw uploadError;
 
-      const { data } = supabase.storage
-        .from(AVATAR_BUCKET)
-        .getPublicUrl(filePath);
+      const { data: signedData, error: signedError } =
+        await supabase.storage
+          .from(AVATAR_BUCKET)
+          .createSignedUrl(filePath, SIGNED_URL_SECONDS);
 
-      const newAvatarUrl = data.publicUrl;
+      if (signedError) throw signedError;
 
       const { data: updatedData, error: updateError } =
         await supabase.auth.updateUser({
           data: {
             ...user.user_metadata,
             full_name: nome.trim(),
-            avatar_url: newAvatarUrl,
+            avatar_path: filePath,
+            avatar_url: null,
           },
         });
 
       if (updateError) throw updateError;
 
       setUser(updatedData.user);
-      setAvatarUrl(newAvatarUrl);
+      setAvatarPath(filePath);
+      setAvatarUrl(signedData.signedUrl);
       setMessage("Foto de perfil atualizada.");
     } catch (error) {
       setErrorMessage(
         error.message ||
-          "Não foi possível enviar a foto. Verifique o armazenamento do Supabase."
+          "Não foi possível enviar a foto. Verifique o Storage e suas políticas."
       );
     } finally {
       setUploading(false);
@@ -164,28 +225,41 @@ function Profile() {
   async function removeAvatar() {
     clearMessages();
 
-    if (!user) return;
+    if (!user || saving || uploading) return;
 
     setSaving(true);
 
-    const { data, error } = await supabase.auth.updateUser({
-      data: {
-        ...user.user_metadata,
-        full_name: nome.trim(),
-        avatar_url: null,
-      },
-    });
+    try {
+      if (avatarPath) {
+        const { error: deleteError } = await supabase.storage
+          .from(AVATAR_BUCKET)
+          .remove([avatarPath]);
 
-    setSaving(false);
+        if (deleteError) throw deleteError;
+      }
 
-    if (error) {
-      setErrorMessage(`Não foi possível remover a foto: ${error.message}`);
-      return;
+      const { data, error } = await supabase.auth.updateUser({
+        data: {
+          ...user.user_metadata,
+          full_name: nome.trim(),
+          avatar_path: null,
+          avatar_url: null,
+        },
+      });
+
+      if (error) throw error;
+
+      setUser(data.user);
+      setAvatarPath("");
+      setAvatarUrl("");
+      setMessage("Foto personalizada removida.");
+    } catch (error) {
+      setErrorMessage(
+        `Não foi possível remover a foto: ${error.message}`
+      );
+    } finally {
+      setSaving(false);
     }
-
-    setUser(data.user);
-    setAvatarUrl("");
-    setMessage("Foto personalizada removida.");
   }
 
   function savePreferences(nextTheme = tema, nextLanguage = idioma) {
@@ -212,19 +286,24 @@ function Profile() {
       return;
     }
 
-    const { error } = await supabase.auth.resetPasswordForEmail(
-      user.email,
-      {
-        redirectTo: `${window.location.origin}/`,
-      }
-    );
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        user.email,
+        {
+          redirectTo: `${window.location.origin}/`,
+        }
+      );
 
-    if (error) {
-      setErrorMessage(`Não foi possível enviar o e-mail: ${error.message}`);
-      return;
+      if (error) throw error;
+
+      setMessage(
+        "Se o serviço estiver configurado, você receberá um e-mail para redefinir sua senha."
+      );
+    } catch (error) {
+      setErrorMessage(
+        `Não foi possível enviar o e-mail: ${error.message}`
+      );
     }
-
-    setMessage("Se o serviço estiver configurado, você receberá um e-mail para redefinir sua senha.");
   }
 
   if (loading) {
@@ -286,7 +365,7 @@ function Profile() {
               className="profile-primary-button"
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
+              disabled={uploading || saving}
             >
               {uploading ? "Enviando..." : "↑ Alterar foto"}
             </button>
@@ -295,7 +374,7 @@ function Profile() {
               className="profile-secondary-button"
               type="button"
               onClick={removeAvatar}
-              disabled={!avatarUrl || saving || uploading}
+              disabled={!avatarPath || saving || uploading}
             >
               Remover foto
             </button>
