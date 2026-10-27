@@ -12,6 +12,7 @@ function Home({
   goal,
   limiteGastos,
   onSalvarLimiteGastos,
+  onUsarValorGuardado,
   saldoBase = 0,
   investimentosBase = 0,
   financialDataLoaded = false,
@@ -19,15 +20,19 @@ function Home({
   return (
     <section className="home">
       <div className="left-panel">
-        <Dashboard
-          transactions={transactions}
-          goal={goal}
-          limiteGastos={limiteGastos}
-          onSalvarLimiteGastos={onSalvarLimiteGastos}
-          saldoBase={saldoBase}
-          investimentosBase={investimentosBase}
-          financialDataLoaded={financialDataLoaded}
-        />
+        
+      <Dashboard
+  transactions={transactions}
+  allTransactions={allTransactions}
+  goal={goal}
+  limiteGastos={limiteGastos}
+  onSalvarLimiteGastos={onSalvarLimiteGastos}
+  onUsarValorGuardado={onUsarValorGuardado}
+  saldoBase={saldoBase}
+  investimentosBase={investimentosBase}
+  financialDataLoaded={financialDataLoaded}
+/>
+
       </div>
 
       <div className="right-panel">

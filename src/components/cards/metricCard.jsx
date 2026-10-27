@@ -36,6 +36,8 @@ function MetricCard({
             case "Teto de Gastos":
                 return "gastos";
 
+            case "Valor guardado": return "guardado";
+
             default:
                 return "";
 

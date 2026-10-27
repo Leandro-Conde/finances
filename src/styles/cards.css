@@ -327,3 +327,11 @@ transform:translateY(0);
     color:#9ca3af;
 
 }
+
+.metric-card.guardado::before {
+    background: radial-gradient(
+        circle,
+        #a78bfa,
+        transparent 70%
+    );
+}

@@ -4,11 +4,15 @@ import { calculateDashboardMetrics } from "../utils/dashboardMetrics";
 import MetricCard from "./cards/metricCard";
 import { getDashboardInsights } from "../utils/dashboardInsights";
 
+
 function Dashboard({
     transactions = [],
+    allTransactions = [],
     goal,
     limiteGastos = 3000,
     onSalvarLimiteGastos,
+    onUsarValorGuardado,
+    onEditarMeta,
     saldoBase = 0,
     investimentosBase = 0,
     financialDataLoaded = false,
@@ -16,6 +20,12 @@ function Dashboard({
     const [modalAberto, setModalAberto] = useState(false);
     const [novoLimite, setNovoLimite] = useState(String(limiteGastos));
     const [erro, setErro] = useState("");
+
+    const [modalValorGuardado, setModalValorGuardado] = useState(false);
+    const [valorParaUsar, setValorParaUsar] = useState("");
+    const [erroValorGuardado, setErroValorGuardado] = useState("");
+    const [salvandoValorGuardado, setSalvandoValorGuardado] = useState(false);
+
 
     useEffect(() => {
         setNovoLimite(String(limiteGastos));
@@ -26,7 +36,6 @@ function Dashboard({
         entradas,
         saidas,
         investimentos,
-        rendaPassiva,
         economia,
         tetoGastos,
         percentualGasto,
@@ -38,6 +47,24 @@ function Dashboard({
     );
 
     const insights = getDashboardInsights(transactions);
+
+    
+    const totalJaUtilizado = allTransactions
+    .filter(
+        (item) =>
+            item.tipo === "saida" &&
+            item.descricao === "Valor guardado usado"
+    )
+    .reduce(
+        (total, item) => total + Number(item.valor || 0),
+        0
+    );
+
+    const valorGuardado = Math.max(
+    0,
+    Number(goal?.valor_inicial || 0) - totalJaUtilizado
+    );
+
 
     const valorAtualMeta =
         Number(goal?.valor_inicial || 0) + investimentos;
@@ -79,6 +106,50 @@ function Dashboard({
             setErro("Não foi possível salvar. Tente novamente.");
         }
     }
+
+    
+async function usarValorGuardado(event) {
+    event.preventDefault();
+
+    const valor = Number(valorParaUsar.replace(",", "."));
+
+    if (!Number.isFinite(valor) || valor <= 0) {
+        setErroValorGuardado("Informe um valor válido maior que zero.");
+        return;
+    }
+
+    if (valor > valorGuardado + 0.001) {
+        setErroValorGuardado(
+            "O valor informado ultrapassa o dinheiro guardado disponível."
+        );
+        return;
+    }
+
+    if (typeof onUsarValorGuardado !== "function") {
+        setErroValorGuardado(
+            "A função de utilização ainda não foi conectada."
+        );
+        return;
+    }
+
+    try {
+        setErroValorGuardado("");
+        setSalvandoValorGuardado(true);
+
+        await onUsarValorGuardado(valor);
+
+        setValorParaUsar("");
+        setModalValorGuardado(false);
+    } catch (error) {
+        console.error("Erro ao usar valor guardado:", error);
+        setErroValorGuardado(
+            error.message || "Não foi possível registrar a utilização."
+        );
+    } finally {
+        setSalvandoValorGuardado(false);
+    }
+}
+
 
     if (!financialDataLoaded) {
         return (
@@ -123,16 +194,41 @@ function Dashboard({
                 />
 
                 <MetricCard
-                    titulo="Renda Passiva"
-                    valor={rendaPassiva}
-                    delay={480}
-                />
-
-                <MetricCard
                     titulo="Economia"
                     valor={economia}
                     delay={600}
                 />
+
+                
+<MetricCard
+    titulo="Valor guardado"
+    valor={valorGuardado}
+    delay={660}
+>
+    <button
+        type="button"
+        disabled={valorGuardado <= 0}
+        onClick={() => {
+            setValorParaUsar("");
+            setErroValorGuardado("");
+            setModalValorGuardado(true);
+        }}
+        style={{
+            display: "block",
+            marginTop: 8,
+            padding: "6px 10px",
+            background: "#27272a",
+            color: "#fff",
+            border: "1px solid #52525b",
+            borderRadius: 8,
+            cursor: valorGuardado > 0 ? "pointer" : "not-allowed",
+            opacity: valorGuardado > 0 ? 1 : 0.5,
+        }}
+    >
+        Usar valor guardado
+    </button>
+</MetricCard>
+
 
                 <MetricCard
                     titulo="Teto de Gastos"
@@ -163,6 +259,127 @@ function Dashboard({
                     >
                         Alterar limite
                     </button>
+
+                    
+{modalValorGuardado && (
+    <div
+        role="presentation"
+        onClick={(event) => {
+            if (event.target === event.currentTarget && !salvandoValorGuardado) {
+                setModalValorGuardado(false);
+            }
+        }}
+        style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1001,
+            background: "rgba(0, 0, 0, 0.75)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+        }}
+    >
+        <form
+            onSubmit={usarValorGuardado}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titulo-valor-guardado"
+            style={{
+                width: "100%",
+                maxWidth: 400,
+                padding: 24,
+                background: "#18181b",
+                color: "#fff",
+                border: "1px solid #3f3f46",
+                borderRadius: 16,
+                boxSizing: "border-box",
+            }}
+        >
+            <h2 id="titulo-valor-guardado">Usar valor guardado</h2>
+
+            <p>
+                Disponível: <strong>{formatarMoeda(valorGuardado)}</strong>
+            </p>
+
+            <label
+                htmlFor="valor-para-usar"
+                style={{ display: "block", marginBottom: 8 }}
+            >
+                Quanto deseja utilizar? (R$)
+            </label>
+
+            <input
+                id="valor-para-usar"
+                type="number"
+                min="0.01"
+                max={valorGuardado}
+                step="0.01"
+                required
+                value={valorParaUsar}
+                onChange={(event) => setValorParaUsar(event.target.value)}
+                disabled={salvandoValorGuardado}
+                style={{
+                    width: "100%",
+                    padding: 12,
+                    background: "#09090b",
+                    color: "#fff",
+                    border: "1px solid #52525b",
+                    borderRadius: 8,
+                    boxSizing: "border-box",
+                }}
+            />
+
+            {erroValorGuardado && (
+                <p role="alert" style={{ color: "#f87171" }}>
+                    {erroValorGuardado}
+                </p>
+            )}
+
+            <div
+                style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    gap: 8,
+                    marginTop: 20,
+                }}
+            >
+                <button
+                    type="button"
+                    disabled={salvandoValorGuardado}
+                    onClick={() => setModalValorGuardado(false)}
+                    style={{
+                        padding: "9px 12px",
+                        background: "#27272a",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 8,
+                        cursor: "pointer",
+                    }}
+                >
+                    Cancelar
+                </button>
+
+                <button
+                    type="submit"
+                    disabled={salvandoValorGuardado || valorGuardado <= 0}
+                    style={{
+                        padding: "9px 12px",
+                        background: "#7c3aed",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 8,
+                        cursor: "pointer",
+                        opacity: salvandoValorGuardado ? 0.6 : 1,
+                    }}
+                >
+                    {salvandoValorGuardado ? "Registrando..." : "Confirmar utilização"}
+                </button>
+            </div>
+        </form>
+    </div>
+)}
+
                 </MetricCard>
             </div>
 

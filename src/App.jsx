@@ -92,6 +92,36 @@ function App() {
 
   const [limiteGastos, setLimiteGastos] = useState(3000);
 
+  
+async function loadTransactions() {
+  if (!user) return false;
+
+  setFinancialDataLoaded(false);
+
+  try {
+    const [transactionsData, balances] = await Promise.all([
+      getTransactions(user.id),
+      getPreservedFinancialBalances(user.id),
+    ]);
+
+    setTransactions(transactionsData);
+    setSaldoBase(balances.saldoBase);
+    setInvestimentosBase(balances.investimentosBase);
+    setFinancialDataLoaded(true);
+
+    return true;
+  } catch (error) {
+    console.error("Erro ao carregar dados financeiros:", error);
+
+    window.alert(
+      "Não foi possível carregar seus dados financeiros. Verifique sua conexão e tente novamente."
+    );
+
+    return false;
+  }
+}
+
+
   // Controla a navegação entre o dashboard e o perfil.
   const [currentPage, setCurrentPage] = useState("home");
 
@@ -144,33 +174,71 @@ function App() {
 
   
 
-  async function loadTransactions() {
-    if (!user) return false;
-  
-    setFinancialDataLoaded(false);
-  
-    try {
-      const [transactionsData, balances] = await Promise.all([
-        getTransactions(user.id),
-        getPreservedFinancialBalances(user.id),
-      ]);
-  
-      setTransactions(transactionsData);
-      setSaldoBase(balances.saldoBase);
-      setInvestimentosBase(balances.investimentosBase);
-  
-      setFinancialDataLoaded(true);
-      return true;
-    } catch (error) {
-      console.error("Erro ao carregar dados financeiros:", error);
-  
-      window.alert(
-        "Não foi possível carregar seus dados financeiros. Verifique sua conexão e tente novamente."
-      );
-  
-      return false;
-    }
+ 
+async function handleUseSavedMoney(valor) {
+  if (!user) {
+    throw new Error("Você precisa estar autenticado.");
   }
+
+  if (!goal) {
+    throw new Error("Cadastre uma meta antes de usar o valor guardado.");
+  }
+
+  const valorUtilizado = Number(valor);
+
+  if (!Number.isFinite(valorUtilizado) || valorUtilizado <= 0) {
+    throw new Error("Informe um valor válido.");
+  }
+
+  const totalJaUtilizado = transactions
+    .filter(
+      (item) =>
+        item.tipo === "saida" &&
+        item.descricao === "Valor guardado usado"
+    )
+    .reduce(
+      (total, item) => total + Number(item.valor || 0),
+      0
+    );
+
+  const valorDisponivel = Math.max(
+    0,
+    Number(goal.valor_inicial || 0) - totalJaUtilizado
+  );
+
+  if (valorUtilizado > valorDisponivel + 0.001) {
+    throw new Error(
+      "O valor informado é maior que o valor guardado disponível."
+    );
+  }
+
+  const hoje = new Date();
+  const dataLocal = [
+    hoje.getFullYear(),
+    String(hoje.getMonth() + 1).padStart(2, "0"),
+    String(hoje.getDate()).padStart(2, "0"),
+  ].join("-");
+
+  const { error } = await supabase
+    .from("transactions")
+    .insert({
+      user_id: user.id,
+      tipo: "saida",
+      categoria: "Valor guardado",
+      descricao: "Valor guardado usado",
+      valor: valorUtilizado,
+      data: dataLocal,
+      observacao: "Utilização de dinheiro guardado.",
+    });
+
+  if (error) {
+    console.error("Erro ao utilizar valor guardado:", error);
+    throw new Error("Não foi possível registrar a utilização no Supabase.");
+  }
+
+  await loadTransactions();
+}
+
   
 
   useEffect(() => {
@@ -673,6 +741,7 @@ function App() {
         goal={goal}
         limiteGastos={limiteGastos}
         onSalvarLimiteGastos={handleSaveSpendingLimit}
+        onUsarValorGuardado={handleUseSavedMoney}
         saldoBase={saldoBase}
         investimentosBase={investimentosBase}
         financialDataLoaded={financialDataLoaded}
