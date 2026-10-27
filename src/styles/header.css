@@ -174,3 +174,120 @@
 .profile-icon-button {
   overflow: hidden;
 }
+
+
+
+.accessibility-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.accessibility-button {
+  width: 48px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #6d28d9;
+  border-radius: 12px;
+  background: #1a102b;
+  color: #ffffff;
+  font-size: 30px;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.accessibility-button:hover {
+  background: #4c1d95;
+  transform: translateY(-1px);
+}
+
+.accessibility-button:focus-visible,
+.accessibility-close:focus-visible {
+  outline: 3px solid #c4b5fd;
+  outline-offset: 3px;
+}
+
+.accessibility-panel {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 1000;
+  width: min(320px, calc(100vw - 32px));
+  padding: 20px;
+  border: 1px solid #454052;
+  border-radius: 16px;
+  background: #17151f;
+  color: #ffffff;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+
+.accessibility-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.accessibility-panel-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.accessibility-panel p {
+  color: #c4c0d0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.accessibility-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #ffffff;
+  font-size: 26px;
+  cursor: pointer;
+}
+
+.accessibility-close:hover {
+  background: #373142;
+}
+
+.accessibility-option {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 0;
+  border-bottom: 1px solid #393442;
+}
+
+.accessibility-option span {
+  font-weight: 600;
+}
+
+.accessibility-option small {
+  color: #c4c0d0;
+  line-height: 1.4;
+}
+
+.accessibility-coming-soon {
+  margin-bottom: 0;
+  font-size: 0.8rem !important;
+}
+
+@media (max-width: 480px) {
+  .accessibility-button {
+    width: 40px;
+    height: 40px;
+    font-size: 26px;
+  }
+
+  .accessibility-panel {
+    right: -90px;
+  }
+}

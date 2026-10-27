@@ -9,6 +9,7 @@ const SIGNED_URL_SECONDS = 60 * 60;
 function Header({ onOpenProfile, onGoHome, currentPage = "home" }) {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [userId, setUserId] = useState("");
+  const [accessibilityOpen, setAccessibilityOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -99,6 +100,70 @@ function Header({ onOpenProfile, onGoHome, currentPage = "home" }) {
       </button>
 
       <div className="header-actions">
+        <div className="accessibility-container">
+          <button
+            className="accessibility-button"
+            type="button"
+            onClick={() => setAccessibilityOpen((open) => !open)}
+            aria-label="Acessibilidade"
+            aria-expanded={accessibilityOpen}
+            aria-controls="accessibility-panel"
+            title="Acessibilidade"
+          >
+            <span aria-hidden="true">♿</span>
+          </button>
+
+          {accessibilityOpen && (
+            <section
+              id="accessibility-panel"
+              className="accessibility-panel"
+              aria-label="Painel de acessibilidade"
+            >
+              <div className="accessibility-panel-header">
+                <h3>Acessibilidade</h3>
+
+                <button
+                  type="button"
+                  className="accessibility-close"
+                  onClick={() => setAccessibilityOpen(false)}
+                  aria-label="Fechar painel de acessibilidade"
+                >
+                  ×
+                </button>
+              </div>
+
+              <p>
+                Personalize sua experiência no Atlas Finance.
+              </p>
+
+              <div className="accessibility-option">
+                <span>Leitura facilitada</span>
+                <small>
+                  Ajustes de tamanho do texto
+                </small>
+              </div>
+
+              <div className="accessibility-option">
+                <span>Contraste e visibilidade</span>
+                <small>
+                  Melhorias para leitura dos elementos
+                </small>
+              </div>
+
+              <div className="accessibility-option">
+                <span>Navegação por teclado</span>
+                <small>
+                  Acesso aos controles sem usar o mouse
+                </small>
+              </div>
+
+              <p className="accessibility-coming-soon">
+                Os ajustes serão habilitados nas próximas etapas.
+              </p>
+            </section>
+          )}
+        </div>
+
         <button
           className="profile-icon-button"
           type="button"
