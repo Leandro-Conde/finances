@@ -408,6 +408,11 @@ async function handleUseSavedMoney(valor) {
     setEditingGoal(null);
   }
 
+  function handleEditGoalFromDashboard() {
+    setEditingGoal(goal);
+    setGoalModalOpen(true);
+  }
+
   // Verifica a sessão e acompanha o estado de autenticação.
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -734,19 +739,19 @@ async function handleUseSavedMoney(valor) {
 
           {/* Dashboard */}
           <Home
-        transactions={filteredTransactions}
-        allTransactions={transactions}
-        loans={loans}
-        scheduledBills={scheduledBills}
-        goal={goal}
-        limiteGastos={limiteGastos}
-        onSalvarLimiteGastos={handleSaveSpendingLimit}
-        onUsarValorGuardado={handleUseSavedMoney}
-        saldoBase={saldoBase}
-        investimentosBase={investimentosBase}
-        financialDataLoaded={financialDataLoaded}
-      />
-
+      transactions={filteredTransactions}
+      allTransactions={transactions}
+      loans={loans}
+      scheduledBills={scheduledBills}
+      goal={goal}
+      limiteGastos={limiteGastos}
+      onSalvarLimiteGastos={handleSaveSpendingLimit}
+      onUsarValorGuardado={handleUseSavedMoney}
+      onEditarMeta={handleEditGoalFromDashboard}
+      saldoBase={saldoBase}
+      investimentosBase={investimentosBase}
+      financialDataLoaded={financialDataLoaded}
+    />
           {/* Filtros */}
           <div className="filter-toggle">
             <button
@@ -851,19 +856,9 @@ async function handleUseSavedMoney(valor) {
 
               {/* Meta Mensal */}
               <div className="panel-card">
-                <div className="goal-header">
-                  <h3>🎯 Meta Mensal</h3>
-
-                  <button
-                    className="goal-add"
-                    onClick={() => {
-                      setEditingGoal(goal);
-                      setGoalModalOpen(true);
-                    }}
-                  >
-                    ✏️
-                  </button>
-                </div>
+              <div className="goal-header">
+              <h3>🎯 Meta Mensal</h3>
+              </div>
 
                 {goal ? (
                   <>

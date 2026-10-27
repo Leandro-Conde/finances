@@ -13,6 +13,7 @@ function Home({
   limiteGastos,
   onSalvarLimiteGastos,
   onUsarValorGuardado,
+  onEditarMeta,
   saldoBase = 0,
   investimentosBase = 0,
   financialDataLoaded = false,
@@ -31,6 +32,7 @@ function Home({
   saldoBase={saldoBase}
   investimentosBase={investimentosBase}
   financialDataLoaded={financialDataLoaded}
+  onEditarMeta={onEditarMeta}
 />
 
       </div>
