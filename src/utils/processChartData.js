@@ -1,28 +1,32 @@
 
-export function processChartData(transactions, mode = "diario") {
+export function processChartData(transactions = [], mode = "diario") {
   const grouped = {};
 
   transactions.forEach((transaction) => {
-    const originalDate = transaction.data;
+    // Evita erros com transações sem data.
+    if (!transaction?.data) return;
+
+    const originalDate = String(transaction.data);
 
     const date =
       mode === "mensal"
         ? originalDate.slice(0, 7)
         : originalDate;
 
+    // ALTERAÇÃO: inicializa todas as séries do gráfico.
     if (!grouped[date]) {
       grouped[date] = {
         data: date,
         entrada: 0,
         saida: 0,
         investimento: 0,
-        valorGuardadoUtilizado: 0, // ALTERAÇÃO: nova série
+        valorGuardadoUtilizado: 0,
       };
     }
 
-    const valor = Number(transaction.valor || 0);
+    const valor = Number(transaction.valor) || 0;
 
-    // ALTERAÇÃO: separa o uso da reserva das despesas comuns.
+    // ALTERAÇÃO: separa as retiradas da reserva das despesas comuns.
     if (
       transaction.tipo === "saida" &&
       transaction.descricao === "Valor guardado usado"
@@ -41,7 +45,6 @@ export function processChartData(transactions, mode = "diario") {
         break;
 
       case "investimento":
-      case "renda_passiva":
         grouped[date].investimento += valor;
         break;
 
@@ -50,6 +53,7 @@ export function processChartData(transactions, mode = "diario") {
     }
   });
 
+  // Mantém os dados organizados cronologicamente.
   return Object.values(grouped).sort((a, b) =>
     a.data.localeCompare(b.data)
   );

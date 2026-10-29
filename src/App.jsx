@@ -90,7 +90,9 @@ function App() {
   const [showScheduledBills, setShowScheduledBills] = useState(true);
   const [showTransactions, setShowTransactions] = useState(true);
 
-  const [limiteGastos, setLimiteGastos] = useState(3000);
+  const [limiteGastos, setLimiteGastos] = useState(3000); 
+  const [valorGuardadoUtilizadoBase, setValorGuardadoUtilizadoBase] = useState(0);
+
 
   
 async function loadTransactions() {
@@ -107,7 +109,11 @@ async function loadTransactions() {
     setTransactions(transactionsData);
     setSaldoBase(balances.saldoBase);
     setInvestimentosBase(balances.investimentosBase);
-    setFinancialDataLoaded(true);
+    setFinancialDataLoaded(true);    
+    setValorGuardadoUtilizadoBase(
+    Number(balances?.valorGuardadoUtilizadoBase ?? 0)
+    );
+
 
     return true;
   } catch (error) {
@@ -192,16 +198,20 @@ async function handleUseSavedMoney(valor) {
 
   
 /* ALTERAÇÃO: calcular o total já utilizado */
-const totalJaUtilizado = transactions
-  .filter(
-    (item) =>
-      item.tipo === "saida" &&
-      item.descricao === "Valor guardado usado"
-  )
-  .reduce(
-    (total, item) => total + Number(item.valor || 0),
-    0
-  );
+
+const totalJaUtilizado =
+  Number(valorGuardadoUtilizadoBase || 0) +
+  transactions
+    .filter(
+      (item) =>
+        item.tipo === "saida" &&
+        item.descricao === "Valor guardado usado"
+    )
+    .reduce(
+      (total, item) => total + Number(item.valor || 0),
+      0
+    );
+
 
 /* ALTERAÇÃO: considerar o saldo inicial de investimentos
    e os investimentos registrados no histórico */
@@ -604,16 +614,20 @@ async function saveGoal(goalData) {
     );
 
 
-    const totalValorGuardadoUtilizado = transactions
-    .filter(
-      (item) =>
-        item.tipo === "saida" &&
-        item.descricao === "Valor guardado usado"
-    )
-    .reduce(
-      (total, item) => total + Number(item.valor || 0),
-      0
-    );
+    
+    const totalValorGuardadoUtilizado =
+    Number(valorGuardadoUtilizadoBase || 0) +
+    transactions
+      .filter(
+        (item) =>
+          item.tipo === "saida" &&
+          item.descricao === "Valor guardado usado"
+      )
+      .reduce(
+        (total, item) => total + Number(item.valor || 0),
+        0
+      );
+
   
   const valorAtualMeta = goal
     ? Math.max(
@@ -817,6 +831,7 @@ async function saveGoal(goalData) {
       saldoBase={saldoBase}
       investimentosBase={investimentosBase}
       financialDataLoaded={financialDataLoaded}
+      valorGuardadoUtilizadoBase={valorGuardadoUtilizadoBase}
     />
           {/* Filtros */}
           <div className="filter-toggle">

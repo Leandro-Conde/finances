@@ -1,3 +1,4 @@
+
 const HORIZON_MONTHS = 1;
 
 function toLocalISO(date) {
@@ -48,28 +49,28 @@ function addMonthsClamped(date, months, preferredDay = date.getDate()) {
   );
 }
 
-function getCurrentBalance(transactions, todayISO) {
+function getCurrentBalance(transactions, todayISO, saldoBase = 0) {
   return transactions.reduce((balance, transaction) => {
     const date = transaction.data?.slice(0, 10);
 
-    // O saldo inicial usa apenas transações efetivadas até hoje.
+    // Considera apenas transações efetivadas até hoje.
     if (!date || date > todayISO) return balance;
 
     const value = Number(transaction.valor) || 0;
 
     switch (transaction.tipo) {
       case "entrada":
-      case "renda_passiva":
         return balance + value;
 
       case "saida":
-      case "investimento":
         return balance - value;
 
       default:
+        // Investimentos são contabilizados separadamente.
+        // Renda passiva não faz mais parte do sistema.
         return balance;
     }
-  }, 0);
+  }, Number(saldoBase) || 0);
 }
 
 function addObligation(obligations, date, value, details) {
@@ -116,6 +117,7 @@ function addScheduledBillOccurrences(
 
   // Mantém o dia original do vencimento, ajustando datas como 31/02.
   const preferredDay = dueDate.getDate();
+
   let occurrence = new Date(
     dueDate.getFullYear(),
     dueDate.getMonth(),
@@ -156,7 +158,7 @@ function addLoanObligations(obligations, loans, today, endDate) {
     const value = Number(loan.valor);
     if (!Number.isFinite(value) || value <= 0) return;
 
-    // "pagar" reduz o saldo; "receber" aumenta o saldo.
+    // Pagar reduz o saldo; receber aumenta o saldo.
     const sign = loan.tipo === "receber" ? 1 : -1;
 
     addObligation(obligations, dueDate, sign * value, {
@@ -201,6 +203,7 @@ export function processProjectedBalance({
   loans = [],
   scheduledBills = [],
   mode = "diario",
+  saldoBase = 0,
   now = new Date(),
 }) {
   const today = new Date(
@@ -212,7 +215,13 @@ export function processProjectedBalance({
   const todayISO = toLocalISO(today);
   const endDate = addMonthsClamped(today, HORIZON_MONTHS);
 
-  const currentBalance = getCurrentBalance(allTransactions, todayISO);
+  // ALTERAÇÃO: inclui o saldo preservado após a limpeza do histórico.
+  const currentBalance = getCurrentBalance(
+    allTransactions,
+    todayISO,
+    saldoBase
+  );
+
   const obligations = new Map();
 
   scheduledBills.forEach((bill) => {
@@ -223,7 +232,7 @@ export function processProjectedBalance({
 
   const possibleDuplicates = findPossibleDuplicates(obligations);
 
-  // O mapa preserva os dados reais que já eram exibidos pelo gráfico.
+  // Preserva os dados reais já exibidos pelo gráfico.
   const points = new Map();
 
   chartData.forEach((item) => {
@@ -239,12 +248,12 @@ export function processProjectedBalance({
     const currentMonth = todayISO.slice(0, 7);
     const endMonth = toLocalISO(endDate).slice(0, 7);
 
-    // O ponto do mês atual começa no saldo de hoje.
     const currentPoint = points.get(currentMonth) || {
       data: currentMonth,
       entrada: 0,
       saida: 0,
       investimento: 0,
+      valorGuardadoUtilizado: 0,
     };
 
     points.set(currentMonth, {
@@ -252,7 +261,11 @@ export function processProjectedBalance({
       saldoProjetado: runningBalance,
     });
 
-    let monthCursor = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    let monthCursor = new Date(
+      today.getFullYear(),
+      today.getMonth() + 1,
+      1
+    );
 
     while (toLocalISO(monthCursor).slice(0, 7) <= endMonth) {
       const monthKey = toLocalISO(monthCursor).slice(0, 7);
@@ -270,6 +283,7 @@ export function processProjectedBalance({
         entrada: 0,
         saida: 0,
         investimento: 0,
+        valorGuardadoUtilizado: 0,
       };
 
       points.set(monthKey, {
@@ -302,6 +316,7 @@ export function processProjectedBalance({
         entrada: 0,
         saida: 0,
         investimento: 0,
+        valorGuardadoUtilizado: 0,
       };
 
       points.set(dateKey, {

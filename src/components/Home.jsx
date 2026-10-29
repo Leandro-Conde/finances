@@ -16,7 +16,9 @@ function Home({
   onEditarMeta,
   saldoBase = 0,
   investimentosBase = 0,
+  valorGuardadoUtilizadoBase = 0,
   financialDataLoaded = false,
+
 }) {
   return (
     <section className="home">
@@ -31,20 +33,25 @@ function Home({
   onUsarValorGuardado={onUsarValorGuardado}
   saldoBase={saldoBase}
   investimentosBase={investimentosBase}
+  valorGuardadoUtilizadoBase={valorGuardadoUtilizadoBase}
   financialDataLoaded={financialDataLoaded}
+
   onEditarMeta={onEditarMeta}
 />
 
       </div>
 
       <div className="right-panel">
-        <FinanceChart
-          transactions={transactions}
-          allTransactions={allTransactions}
-          loans={loans}
-          scheduledBills={scheduledBills}
-          limiteGastos={limiteGastos}
-        />
+        
+      <FinanceChart
+        transactions={transactions}
+        allTransactions={allTransactions}
+        loans={loans}
+        scheduledBills={scheduledBills}
+        limiteGastos={limiteGastos}
+        saldoBase={saldoBase}
+      />
+
       </div>
     </section>
   );

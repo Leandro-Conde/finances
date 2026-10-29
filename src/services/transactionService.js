@@ -83,24 +83,33 @@ export async function countTransactionsToClean(userId, meses) {
 /**
  * Lê os valores acumulados após limpezas anteriores.
  */
+
 export async function getPreservedFinancialBalances(userId) {
     if (!userId) {
-        throw new Error("Usuário não autenticado.");
+      throw new Error("Usuário não autenticado.");
     }
-
+  
     const { data, error } = await supabase
-        .from("user_financial_balances")
-        .select("saldo_base, investimentos_base")
-        .eq("user_id", userId)
-        .maybeSingle();
-
-    if (error) throw error;
-
+      .from("user_financial_balances")
+      .select(
+        "saldo_base, investimentos_base, valor_guardado_utilizado_base"
+      )
+      .eq("user_id", userId)
+      .maybeSingle();
+  
+    if (error) {
+      throw error;
+    }
+  
     return {
-        saldoBase: Number(data?.saldo_base ?? 0),
-        investimentosBase: Number(data?.investimentos_base ?? 0),
+      saldoBase: Number(data?.saldo_base ?? 0),
+      investimentosBase: Number(data?.investimentos_base ?? 0),
+      valorGuardadoUtilizadoBase: Number(
+        data?.valor_guardado_utilizado_base ?? 0
+      ),
     };
-}
+  }
+  
 
 /**
  * Limpa o histórico por meio da função SQL transacional.

@@ -63,13 +63,16 @@ function getDateThreeMonthsAgo() {
   return date;
 }
 
+
 function FinanceChart({
   transactions = [],
   allTransactions = [],
   loans = [],
   scheduledBills = [],
   limiteGastos = 3000,
+  saldoBase = 0,
 }) {
+
   const [mode, setMode] = useState("diario");
   const [direction, setDirection] = useState("esquerda");
   const [inverted, setInverted] = useState(false);
@@ -132,13 +135,16 @@ function FinanceChart({
         return item.data >= tresMesesAtrasISO && item.data <= todayISO;
       });
 
-  const projection = processProjectedBalance({
-    chartData: data,
-    allTransactions,
-    loans,
-    scheduledBills,
-    mode,
-  });
+  
+const projection = processProjectedBalance({
+  chartData: data,
+  allTransactions,
+  loans,
+  scheduledBills,
+  mode,
+  saldoBase,
+});
+
 
   const orderedData =
     direction === "esquerda"

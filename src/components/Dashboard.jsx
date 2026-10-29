@@ -13,7 +13,9 @@ function Dashboard({
     onEditarMeta,
     saldoBase = 0,
     investimentosBase = 0,
+    valorGuardadoUtilizadoBase = 0,
     financialDataLoaded = false,
+
 }) {
     const [modalAberto, setModalAberto] = useState(false);
     const [novoLimite, setNovoLimite] = useState(String(limiteGastos));
@@ -47,16 +49,20 @@ function Dashboard({
 
     
     /* ALTERAÇÃO: soma todo o dinheiro já utilizado */
-    const totalJaUtilizado = allTransactions
-        .filter(
-            (item) =>
-                item.tipo === "saida" &&
-                item.descricao === "Valor guardado usado"
-        )
-        .reduce(
-            (total, item) => total + Number(item.valor || 0),
-            0
-        );
+    
+const totalJaUtilizado =
+Number(valorGuardadoUtilizadoBase || 0) +
+allTransactions
+    .filter(
+        (item) =>
+            item.tipo === "saida" &&
+            item.descricao === "Valor guardado usado"
+    )
+    .reduce(
+        (total, item) => total + Number(item.valor || 0),
+        0
+    );
+
 
     /* ALTERAÇÃO: calcula os investimentos usando o histórico completo */
     const totalInvestimentosGuardados =
