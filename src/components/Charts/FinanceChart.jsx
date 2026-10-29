@@ -441,6 +441,19 @@ function FinanceChart({
               animationDuration={900}
             />
 
+            
+            {/* ALTERAÇÃO: série para valores retirados da reserva */}
+            <Area
+              type="monotone"
+              dataKey="valorGuardadoUtilizado"
+              name="Valor guardado utilizado"
+              stroke="#22D3EE"
+              fill="#22D3EE33"
+              strokeWidth={3}
+              animationDuration={900}
+            />
+
+
             {showProjection && (
               <Line
                 yAxisId="saldo"

@@ -190,27 +190,45 @@ async function handleUseSavedMoney(valor) {
     throw new Error("Informe um valor válido.");
   }
 
-  const totalJaUtilizado = transactions
-    .filter(
-      (item) =>
-        item.tipo === "saida" &&
-        item.descricao === "Valor guardado usado"
-    )
+  
+/* ALTERAÇÃO: calcular o total já utilizado */
+const totalJaUtilizado = transactions
+  .filter(
+    (item) =>
+      item.tipo === "saida" &&
+      item.descricao === "Valor guardado usado"
+  )
+  .reduce(
+    (total, item) => total + Number(item.valor || 0),
+    0
+  );
+
+/* ALTERAÇÃO: considerar o saldo inicial de investimentos
+   e os investimentos registrados no histórico */
+const totalInvestimentosGuardados =
+  Number(investimentosBase || 0) +
+  transactions
+    .filter((item) => item.tipo === "investimento")
     .reduce(
       (total, item) => total + Number(item.valor || 0),
       0
     );
 
-  const valorDisponivel = Math.max(
-    0,
-    Number(goal.valor_inicial || 0) - totalJaUtilizado
-  );
+/* ALTERAÇÃO: usar a mesma regra de cálculo do Dashboard */
+const valorDisponivel = Math.max(
+  0,
+  Number(goal.valor_inicial || 0) +
+    totalInvestimentosGuardados -
+    totalJaUtilizado
+);
 
-  if (valorUtilizado > valorDisponivel + 0.001) {
-    throw new Error(
-      "O valor informado é maior que o valor guardado disponível."
-    );
-  }
+/* ALTERAÇÃO: validar contra o saldo realmente disponível */
+if (valorUtilizado > valorDisponivel + 0.001) {
+  throw new Error(
+    "O valor informado ultrapassa o dinheiro guardado disponível."
+  );
+}
+
 
   const hoje = new Date();
   const dataLocal = [
@@ -384,29 +402,55 @@ async function handleUseSavedMoney(valor) {
     }
   }
 
-  async function saveGoal(goalData) {
-    if (goalData.id) {
-      await updateGoal(goalData.id, {
-        nome: goalData.nome,
-        valor_meta: Number(goalData.valor_meta),
-        valor_inicial: Number(goalData.valor_inicial),
-        prazo_meses: Number(goalData.prazo_meses),
-      });
-    } else {
-      await createGoal({
-        nome: goalData.nome,
-        valor_meta: Number(goalData.valor_meta),
-        valor_inicial: Number(goalData.valor_inicial),
-        prazo_meses: Number(goalData.prazo_meses),
-        user_id: user.id,
-      });
-    }
-
-    await loadGoal();
-
-    setGoalModalOpen(false);
-    setEditingGoal(null);
+ 
+async function saveGoal(goalData) {
+  if (!user) {
+    throw new Error("Usuário não autenticado.");
   }
+
+  const dadosMeta = {
+    nome: "Investimentos/Guardados",
+    valor_meta: Number(goalData.valor_meta),
+    valor_inicial: Number(goalData.valor_inicial || 0),
+    prazo_meses: Number(goalData.prazo_meses),
+  };
+
+  if (
+    !Number.isFinite(dadosMeta.valor_meta) ||
+    dadosMeta.valor_meta <= 0
+  ) {
+    throw new Error("O valor-alvo precisa ser maior que zero.");
+  }
+
+  if (
+    !Number.isFinite(dadosMeta.valor_inicial) ||
+    dadosMeta.valor_inicial < 0
+  ) {
+    throw new Error("O valor inicial não pode ser negativo.");
+  }
+
+  if (
+    !Number.isInteger(dadosMeta.prazo_meses) ||
+    dadosMeta.prazo_meses <= 0
+  ) {
+    throw new Error("O prazo precisa ser um número inteiro de meses.");
+  }
+
+  if (goalData.id) {
+    await updateGoal(goalData.id, dadosMeta);
+  } else {
+    await createGoal({
+      ...dadosMeta,
+      user_id: user.id,
+    });
+  }
+
+  await loadGoal();
+
+  setGoalModalOpen(false);
+  setEditingGoal(null);
+}
+
 
   function handleEditGoalFromDashboard() {
     setEditingGoal(goal);
@@ -550,24 +594,46 @@ async function handleUseSavedMoney(valor) {
     return <Login />;
   }
 
-  const totalInvestimentos = investimentosBase + transactions
-  .filter((item) => item.tipo === "investimento")
-  .reduce(
-    (total, item) => total + Number(item.valor || 0),
-    0
-  );
+  const totalInvestimentos =
+  Number(investimentosBase || 0) +
+  transactions
+    .filter((item) => item.tipo === "investimento")
+    .reduce(
+      (total, item) => total + Number(item.valor || 0),
+      0
+    );
 
+
+    const totalValorGuardadoUtilizado = transactions
+    .filter(
+      (item) =>
+        item.tipo === "saida" &&
+        item.descricao === "Valor guardado usado"
+    )
+    .reduce(
+      (total, item) => total + Number(item.valor || 0),
+      0
+    );
+  
   const valorAtualMeta = goal
-    ? Number(goal.valor_inicial) + totalInvestimentos
-    : 0;
-
-  const percentualMeta = goal
-    ? Math.min(
-        (valorAtualMeta / Number(goal.valor_meta)) * 100,
-        100
+    ? Math.max(
+        0,
+        Number(goal.valor_inicial || 0) +
+          totalInvestimentos -
+          totalValorGuardadoUtilizado
       )
     : 0;
-
+  
+  const percentualMeta =
+    goal && Number(goal.valor_meta) > 0
+      ? Math.min(
+          (valorAtualMeta / Number(goal.valor_meta)) * 100,
+          100
+        )
+      : 0;
+  
+  /* ALTERAÇÃO: removida a segunda declaração duplicada de percentualMeta */
+  
   return (
     <>
       {/* CABEÇALHO: permanece visível nas duas telas */}
@@ -576,7 +642,7 @@ async function handleUseSavedMoney(valor) {
         onOpenProfile={() => setCurrentPage("profile")}
         onGoHome={() => setCurrentPage("home")}
       />
-
+  
       {/* NAVEGAÇÃO: mostra o perfil ou o dashboard */}
       {currentPage === "profile" ? (
         <Profile />
@@ -857,7 +923,7 @@ async function handleUseSavedMoney(valor) {
               {/* Meta Mensal */}
               <div className="panel-card">
               <div className="goal-header">
-              <h3>🎯 Meta Mensal</h3>
+              <h3> Investimentos/Guardados </h3>
               </div>
 
                 {goal ? (

@@ -45,6 +45,8 @@ function Dashboard({
 
     const insights = getDashboardInsights(transactions);
 
+    
+    /* ALTERAÇÃO: soma todo o dinheiro já utilizado */
     const totalJaUtilizado = allTransactions
         .filter(
             (item) =>
@@ -56,22 +58,36 @@ function Dashboard({
             0
         );
 
+    /* ALTERAÇÃO: calcula os investimentos usando o histórico completo */
+    const totalInvestimentosGuardados =
+        Number(investimentosBase || 0) +
+        allTransactions
+            .filter((item) => item.tipo === "investimento")
+            .reduce(
+                (total, item) => total + Number(item.valor || 0),
+                0
+            );
+
+    /* ALTERAÇÃO: o dinheiro guardado inclui os investimentos
+       e desconta os valores que já foram utilizados */
     const valorGuardado = Math.max(
         0,
-        Number(goal?.valor_inicial || 0) - totalJaUtilizado
+        Number(goal?.valor_inicial || 0) +
+            totalInvestimentosGuardados -
+            totalJaUtilizado
     );
 
-    // Mantém o cálculo original da meta para evitar alterar
-    // o comportamento do progresso enquanto corrigimos o modal.
-    const valorAtualMeta =
-        Number(goal?.valor_inicial || 0) + investimentos;
+    /* ALTERAÇÃO: o progresso da meta usa o mesmo cálculo */
+    const valorAtualMeta = valorGuardado;
 
-    const percentualMeta = goal?.valor_meta
-        ? Math.min(
-            (valorAtualMeta / Number(goal.valor_meta)) * 100,
-            100
-        )
-        : 0;
+    const percentualMeta =
+        goal && Number(goal.valor_meta) > 0
+            ? Math.min(
+                (valorAtualMeta / Number(goal.valor_meta)) * 100,
+                100
+            )
+            : 0;
+
 
     const formatarMoeda = (valor) =>
         Number(valor).toLocaleString("pt-BR", {
@@ -321,9 +337,13 @@ function Dashboard({
                             step="0.01"
                             required
                             value={valorParaUsar}
-                            onChange={(event) =>
-                                setValorParaUsar(event.target.value)
-                            }
+                            
+                            /* ALTERAÇÃO: atualiza o valor e limpa o erro antigo ao digitar */
+                            onChange={(event) => {
+                                setValorParaUsar(event.target.value);
+                                setErroValorGuardado("");
+                            }}
+
                             disabled={
                                 salvandoValorGuardado || valorGuardado <= 0
                             }
