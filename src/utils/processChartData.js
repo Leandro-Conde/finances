@@ -1,19 +1,24 @@
 
-export function processChartData(transactions = [], mode = "diario") {
+export function processChartData(
+  transactions = [],
+  mode = "diario",
+  preservedHistory = []
+) {
   const grouped = {};
 
-  transactions.forEach((transaction) => {
-    // Evita erros com transações sem data.
-    if (!transaction?.data) return;
+  function getDateKey(value) {
+    if (!value) return null;
 
-    const originalDate = String(transaction.data);
+    const originalDate = String(value).slice(0, 10);
 
-    const date =
-      mode === "mensal"
-        ? originalDate.slice(0, 7)
-        : originalDate;
+    return mode === "mensal"
+      ? originalDate.slice(0, 7)
+      : originalDate;
+  }
 
-    // ALTERAÇÃO: inicializa todas as séries do gráfico.
+  function ensureDate(date) {
+    if (!date) return null;
+
     if (!grouped[date]) {
       grouped[date] = {
         data: date,
@@ -24,28 +29,53 @@ export function processChartData(transactions = [], mode = "diario") {
       };
     }
 
+    return grouped[date];
+  }
+
+  // 1. Adiciona os dados já preservados no Supabase.
+  preservedHistory.forEach((item) => {
+    const date = getDateKey(item.data);
+    const point = ensureDate(date);
+
+    if (!point) return;
+
+    point.entrada += Number(item.entrada) || 0;
+    point.saida += Number(item.saida) || 0;
+    point.investimento += Number(item.investimento) || 0;
+    point.valorGuardadoUtilizado +=
+      Number(item.valor_guardado_utilizado) || 0;
+  });
+
+  // 2. Adiciona as transações que ainda existem.
+  transactions.forEach((transaction) => {
+    if (!transaction?.data) return;
+
+    const date = getDateKey(transaction.data);
+    const point = ensureDate(date);
+
+    if (!point) return;
+
     const valor = Number(transaction.valor) || 0;
 
-    // ALTERAÇÃO: separa as retiradas da reserva das despesas comuns.
     if (
       transaction.tipo === "saida" &&
       transaction.descricao === "Valor guardado usado"
     ) {
-      grouped[date].valorGuardadoUtilizado += valor;
+      point.valorGuardadoUtilizado += valor;
       return;
     }
 
     switch (transaction.tipo) {
       case "entrada":
-        grouped[date].entrada += valor;
+        point.entrada += valor;
         break;
 
       case "saida":
-        grouped[date].saida += valor;
+        point.saida += valor;
         break;
 
       case "investimento":
-        grouped[date].investimento += valor;
+        point.investimento += valor;
         break;
 
       default:
@@ -53,7 +83,7 @@ export function processChartData(transactions = [], mode = "diario") {
     }
   });
 
-  // Mantém os dados organizados cronologicamente.
+  // 3. Retorna os pontos em ordem cronológica.
   return Object.values(grouped).sort((a, b) =>
     a.data.localeCompare(b.data)
   );

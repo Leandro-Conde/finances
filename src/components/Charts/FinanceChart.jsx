@@ -67,6 +67,7 @@ function getDateThreeMonthsAgo() {
 function FinanceChart({
   transactions = [],
   allTransactions = [],
+  preservedChartHistory = [],
   loans = [],
   scheduledBills = [],
   limiteGastos = 3000,
@@ -121,19 +122,13 @@ function FinanceChart({
     }
   }, [mesAtual, gastosMesAtual, limiteNumerico]);
 
-  const historicalData = processChartData(transactions, mode);
+  const historicalData = processChartData(
+    transactions,
+    mode,
+    preservedChartHistory
+  );
 
-  const data = showProjection
-    ? historicalData
-    : historicalData.filter((item) => {
-        if (mode === "mensal") {
-          const inicioMes = tresMesesAtrasISO.slice(0, 7);
-
-          return item.data >= inicioMes && item.data <= mesAtual;
-        }
-
-        return item.data >= tresMesesAtrasISO && item.data <= todayISO;
-      });
+  const data = historicalData;
 
   
 const projection = processProjectedBalance({

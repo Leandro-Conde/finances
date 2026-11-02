@@ -7,6 +7,7 @@ import "../styles/home.css";
 function Home({
   transactions,
   allTransactions,
+  preservedChartHistory = [],
   loans,
   scheduledBills,
   goal,
@@ -18,8 +19,8 @@ function Home({
   investimentosBase = 0,
   valorGuardadoUtilizadoBase = 0,
   financialDataLoaded = false,
-
 }) {
+
   return (
     <section className="home">
       <div className="left-panel">
@@ -44,13 +45,14 @@ function Home({
       <div className="right-panel">
         
       <FinanceChart
-        transactions={transactions}
-        allTransactions={allTransactions}
-        loans={loans}
-        scheduledBills={scheduledBills}
-        limiteGastos={limiteGastos}
-        saldoBase={saldoBase}
-      />
+  transactions={transactions}
+  allTransactions={allTransactions}
+  preservedChartHistory={preservedChartHistory}
+  loans={loans}
+  scheduledBills={scheduledBills}
+  limiteGastos={limiteGastos}
+  saldoBase={saldoBase}
+/>
 
       </div>
     </section>

@@ -80,6 +80,24 @@ export async function countTransactionsToClean(userId, meses) {
   return Number(data ?? 0);
 }
 
+export async function getPreservedChartHistory(userId) {
+    if (!userId) {
+        throw new Error("Usuário não autenticado.");
+    }
+
+    const { data, error } = await supabase
+        .from("user_financial_chart_history")
+        .select(
+            "data, entrada, saida, investimento, valor_guardado_utilizado"
+        )
+        .eq("user_id", userId)
+        .order("data", { ascending: true });
+
+    if (error) throw error;
+
+    return data ?? [];
+}
+
 /**
  * Lê os valores acumulados após limpezas anteriores.
  */

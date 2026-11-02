@@ -30,6 +30,7 @@ import {
   getTransactions,
   deleteTransaction,
   getPreservedFinancialBalances,
+  getPreservedChartHistory,
   cleanTransactionHistory,
   countTransactionsToClean,
 } from "./services/transactionService";
@@ -93,39 +94,48 @@ function App() {
   const [limiteGastos, setLimiteGastos] = useState(3000); 
   const [valorGuardadoUtilizadoBase, setValorGuardadoUtilizadoBase] = useState(0);
 
+  const [preservedChartHistory, setPreservedChartHistory] = useState([]);
+
 
   
-async function loadTransactions() {
-  if (!user) return false;
-
-  setFinancialDataLoaded(false);
-
-  try {
-    const [transactionsData, balances] = await Promise.all([
-      getTransactions(user.id),
-      getPreservedFinancialBalances(user.id),
-    ]);
-
-    setTransactions(transactionsData);
-    setSaldoBase(balances.saldoBase);
-    setInvestimentosBase(balances.investimentosBase);
-    setFinancialDataLoaded(true);    
-    setValorGuardadoUtilizadoBase(
-    Number(balances?.valorGuardadoUtilizadoBase ?? 0)
-    );
-
-
-    return true;
-  } catch (error) {
-    console.error("Erro ao carregar dados financeiros:", error);
-
-    window.alert(
-      "Não foi possível carregar seus dados financeiros. Verifique sua conexão e tente novamente."
-    );
-
-    return false;
+  async function loadTransactions() {
+    if (!user) return false;
+  
+    setFinancialDataLoaded(false);
+  
+    try {
+      const [
+        transactionsData,
+        balances,
+        chartHistoryData,
+      ] = await Promise.all([
+        getTransactions(user.id),
+        getPreservedFinancialBalances(user.id),
+        getPreservedChartHistory(user.id),
+      ]);
+  
+      setTransactions(transactionsData);
+      setSaldoBase(balances.saldoBase);
+      setInvestimentosBase(balances.investimentosBase);
+      setValorGuardadoUtilizadoBase(
+        Number(balances?.valorGuardadoUtilizadoBase ?? 0)
+      );
+  
+      setPreservedChartHistory(chartHistoryData);
+  
+      setFinancialDataLoaded(true);
+  
+      return true;
+    } catch (error) {
+      console.error("Erro ao carregar dados financeiros:", error);
+  
+      window.alert(
+        "Não foi possível carregar seus dados financeiros. Verifique sua conexão e tente novamente."
+      );
+  
+      return false;
+    }
   }
-}
 
 
   // Controla a navegação entre o dashboard e o perfil.
@@ -535,6 +545,8 @@ async function saveGoal(goalData) {
   
     try {
       const result = await cleanTransactionHistory(months);
+
+      console.log("Resultado da limpeza:", result);
   
       // A exclusão já ocorreu no banco. Agora atualizamos a tela.
       const transactionsReloaded = await loadTransactions();
@@ -832,6 +844,7 @@ async function saveGoal(goalData) {
       investimentosBase={investimentosBase}
       financialDataLoaded={financialDataLoaded}
       valorGuardadoUtilizadoBase={valorGuardadoUtilizadoBase}
+      preservedChartHistory={preservedChartHistory}
     />
           {/* Filtros */}
           <div className="filter-toggle">
