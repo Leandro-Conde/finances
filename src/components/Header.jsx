@@ -1,15 +1,42 @@
-
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../services/supabase";
 import "../styles/header.css";
 
 const AVATAR_BUCKET = "avatars";
 const SIGNED_URL_SECONDS = 60 * 60;
 
+const ACCESSIBILITY_DEFAULTS = {
+  fontScale: "normal",
+  highContrast: false,
+  reducedMotion: false,
+};
+
+function readAccessibilitySettings() {
+  try {
+    const saved = localStorage.getItem("atlas-accessibility");
+
+    if (!saved) return ACCESSIBILITY_DEFAULTS;
+
+    return {
+      ...ACCESSIBILITY_DEFAULTS,
+      ...JSON.parse(saved),
+    };
+  } catch {
+    return ACCESSIBILITY_DEFAULTS;
+  }
+}
+
 function Header({ onOpenProfile, onGoHome, currentPage = "home" }) {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [userId, setUserId] = useState("");
   const [accessibilityOpen, setAccessibilityOpen] = useState(false);
+
+  const [accessibility, setAccessibility] = useState(
+    readAccessibilitySettings
+  );
+
+  const accessibilityContainerRef = useRef(null);
+  const accessibilityButtonRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,12 +102,64 @@ function Header({ onOpenProfile, onGoHome, currentPage = "home" }) {
     };
   }, []);
 
-  async function logout() {
-    const { error } = await supabase.auth.signOut();
+  useEffect(() => {
+    const root = document.documentElement;
 
-    if (error) {
-      console.error("Erro ao sair:", error);
+    root.dataset.fontScale = accessibility.fontScale;
+    root.dataset.highContrast = String(accessibility.highContrast);
+    root.dataset.reducedMotion = String(accessibility.reducedMotion);
+
+    try {
+      localStorage.setItem(
+        "atlas-accessibility",
+        JSON.stringify(accessibility)
+      );
+    } catch (error) {
+      console.warn("Não foi possível salvar as preferências:", error);
     }
+  }, [accessibility]);
+
+  useEffect(() => {
+    if (!accessibilityOpen) return;
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setAccessibilityOpen(false);
+        accessibilityButtonRef.current?.focus();
+      }
+    }
+
+    function handleOutsideClick(event) {
+      if (
+        accessibilityContainerRef.current &&
+        !accessibilityContainerRef.current.contains(event.target)
+      ) {
+        setAccessibilityOpen(false);
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("touchstart", handleOutsideClick);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("touchstart", handleOutsideClick);
+    };
+  }, [accessibilityOpen]);
+
+  function updateAccessibility(key, value) {
+    setAccessibility((previous) => ({
+      ...previous,
+      [key]: value,
+    }));
+  }
+
+  function logout() {
+    supabase.auth.signOut().then(({ error }) => {
+      if (error) console.error("Erro ao sair:", error);
+    });
   }
 
   return (
@@ -93,19 +172,23 @@ function Header({ onOpenProfile, onGoHome, currentPage = "home" }) {
       >
         <img
           src={`${import.meta.env.BASE_URL}atlas-logo.png`}
-          alt="Logo Atlas Finance"
+          alt=""
           className="header-logo"
         />
         <h2>Atlas Finance</h2>
       </button>
 
       <div className="header-actions">
-        <div className="accessibility-container">
+        <div
+          className="accessibility-container"
+          ref={accessibilityContainerRef}
+        >
           <button
+            ref={accessibilityButtonRef}
             className="accessibility-button"
             type="button"
             onClick={() => setAccessibilityOpen((open) => !open)}
-            aria-label="Acessibilidade"
+            aria-label="Abrir painel de acessibilidade"
             aria-expanded={accessibilityOpen}
             aria-controls="accessibility-panel"
             title="Acessibilidade"
@@ -125,7 +208,10 @@ function Header({ onOpenProfile, onGoHome, currentPage = "home" }) {
                 <button
                   type="button"
                   className="accessibility-close"
-                  onClick={() => setAccessibilityOpen(false)}
+                  onClick={() => {
+                    setAccessibilityOpen(false);
+                    accessibilityButtonRef.current?.focus();
+                  }}
                   aria-label="Fechar painel de acessibilidade"
                 >
                   ×
@@ -136,29 +222,109 @@ function Header({ onOpenProfile, onGoHome, currentPage = "home" }) {
                 Personalize sua experiência no Atlas Finance.
               </p>
 
+              <fieldset className="accessibility-option">
+                <legend>Tamanho do texto</legend>
+
+                <div className="accessibility-control-row">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateAccessibility(
+                        "fontScale",
+                        accessibility.fontScale === "larger"
+                          ? "large"
+                          : "normal"
+                      )
+                    }
+                    disabled={accessibility.fontScale === "normal"}
+                    aria-label="Diminuir tamanho do texto"
+                  >
+                    A−
+                  </button>
+
+                  <span aria-live="polite">
+                    {accessibility.fontScale === "normal"
+                      ? "Normal"
+                      : accessibility.fontScale === "large"
+                        ? "Grande"
+                        : "Maior"}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateAccessibility(
+                        "fontScale",
+                        accessibility.fontScale === "normal"
+                          ? "large"
+                          : "larger"
+                      )
+                    }
+                    disabled={accessibility.fontScale === "larger"}
+                    aria-label="Aumentar tamanho do texto"
+                  >
+                    A+
+                  </button>
+                </div>
+              </fieldset>
+
               <div className="accessibility-option">
-                <span>Leitura facilitada</span>
-                <small>
-                  Ajustes de tamanho do texto
-                </small>
+                <div>
+                  <strong>Alto contraste</strong>
+                  <small>Reforça textos, bordas e controles.</small>
+                </div>
+
+                <button
+                  type="button"
+                  className="accessibility-switch"
+                  role="switch"
+                  aria-checked={accessibility.highContrast}
+                  onClick={() =>
+                    updateAccessibility(
+                      "highContrast",
+                      !accessibility.highContrast
+                    )
+                  }
+                >
+                  {accessibility.highContrast ? "Ativado" : "Desativado"}
+                </button>
               </div>
 
               <div className="accessibility-option">
-                <span>Contraste e visibilidade</span>
-                <small>
-                  Melhorias para leitura dos elementos
-                </small>
+                <div>
+                  <strong>Reduzir animações</strong>
+                  <small>Reduz movimentos e transições da interface.</small>
+                </div>
+
+                <button
+                  type="button"
+                  className="accessibility-switch"
+                  role="switch"
+                  aria-checked={accessibility.reducedMotion}
+                  onClick={() =>
+                    updateAccessibility(
+                      "reducedMotion",
+                      !accessibility.reducedMotion
+                    )
+                  }
+                >
+                  {accessibility.reducedMotion
+                    ? "Ativado"
+                    : "Desativado"}
+                </button>
               </div>
 
-              <div className="accessibility-option">
-                <span>Navegação por teclado</span>
-                <small>
-                  Acesso aos controles sem usar o mouse
-                </small>
-              </div>
+              <button
+                type="button"
+                className="accessibility-reset"
+                onClick={() => setAccessibility(ACCESSIBILITY_DEFAULTS)}
+              >
+                Restaurar padrão
+              </button>
 
-              <p className="accessibility-coming-soon">
-                Os ajustes serão habilitados nas próximas etapas.
+              <p className="accessibility-keyboard-help">
+                Dica: use Tab para navegar, Enter ou Espaço para ativar
+                e Esc para fechar este painel.
               </p>
             </section>
           )}
@@ -177,7 +343,7 @@ function Header({ onOpenProfile, onGoHome, currentPage = "home" }) {
             <img
               key={`${userId}-${avatarUrl}`}
               src={avatarUrl}
-              alt="Minha foto de perfil"
+              alt=""
               className="header-avatar"
             />
           ) : (

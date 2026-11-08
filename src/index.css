@@ -605,3 +605,219 @@ a:hover{
   font-size: 10px;
   line-height: 1.4;
 }
+/* =========================================
+   ACESSIBILIDADE GLOBAL - ATLAS FINANCE
+========================================= */
+
+html {
+  scroll-behavior: smooth;
+}
+
+html[data-font-scale="large"] {
+  font-size: 112.5%;
+}
+
+html[data-font-scale="larger"] {
+  font-size: 125%;
+}
+
+html[data-font-scale="large"] input,
+html[data-font-scale="large"] select,
+html[data-font-scale="large"] textarea,
+html[data-font-scale="larger"] input,
+html[data-font-scale="larger"] select,
+html[data-font-scale="larger"] textarea {
+  font-size: 1em;
+}
+
+.skip-to-content {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 20000;
+  padding: 12px 18px;
+  border-radius: 8px;
+  background: #fff;
+  color: #111;
+  font-weight: 700;
+  transform: translateY(-160%);
+}
+
+.skip-to-content:focus {
+  transform: translateY(0);
+  outline: 3px solid #7c3aed;
+  outline-offset: 3px;
+}
+
+.app-main {
+  min-width: 0;
+}
+
+:where(
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  summary,
+  [tabindex]:not([tabindex="-1"])
+):focus-visible {
+  outline: 3px solid #facc15 !important;
+  outline-offset: 3px !important;
+}
+
+button,
+a,
+input,
+select,
+textarea,
+summary {
+  scroll-margin: 90px;
+}
+
+button {
+  touch-action: manipulation;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+}
+
+.history-cleanup-summary {
+  min-height: 44px;
+}
+
+.goal-add,
+.loan-add,
+.scheduled-bill-edit,
+.scheduled-bill-delete {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.loan-toggle {
+  min-height: 36px;
+  font-size: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+html[data-reduced-motion="true"] *,
+html[data-reduced-motion="true"] *::before,
+html[data-reduced-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* Alto contraste: reforço de leitura e separação dos componentes. */
+
+html[data-high-contrast="true"] body {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+html[data-high-contrast="true"] :where(
+  p,
+  span,
+  small,
+  label,
+  strong,
+  h1,
+  h2,
+  h3,
+  h4,
+  li,
+  summary
+) {
+  color: #fff !important;
+}
+
+html[data-high-contrast="true"] :where(
+  .panel-card,
+  .saldo-card,
+  .goal-dashboard-card,
+  .profile-card,
+  .scheduled-bill-item,
+  .accessibility-panel,
+  .modal
+) {
+  background: #000 !important;
+  color: #fff !important;
+  border: 2px solid #fff !important;
+}
+
+html[data-high-contrast="true"] :where(
+  button,
+  input,
+  select,
+  textarea
+) {
+  border: 2px solid #fff !important;
+}
+
+html[data-high-contrast="true"] button {
+  color: #fff !important;
+}
+
+html[data-high-contrast="true"] a {
+  color: #7dd3fc !important;
+  text-decoration: underline;
+}
+
+html[data-high-contrast="true"] :where(
+  .profile-heading p,
+  .profile-section-heading p,
+  .avatar-content > p,
+  .profile-preference p,
+  .profile-security-row p,
+  .scheduled-bill-info span,
+  .scheduled-bill-info small,
+  .history-cleanup-summary,
+  .history-cleanup-content p,
+  .history-cleanup-content small
+) {
+  color: #fff !important;
+}
+
+html[data-high-contrast="true"] .filter-bar button.active {
+  background: #fff !important;
+  color: #000 !important;
+  border: 2px solid #fff !important;
+}
+
+html[data-high-contrast="true"] :focus-visible {
+  outline: 4px solid #ffff00 !important;
+  outline-offset: 4px !important;
+}
+
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 3px solid Highlight !important;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    forced-color-adjust: auto;
+  }
+}

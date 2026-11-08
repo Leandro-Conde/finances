@@ -669,6 +669,9 @@ async function saveGoal(goalData) {
         onGoHome={() => setCurrentPage("home")}
       />
   
+      <a className="skip-to-content" href="#main-content">Pular para o conteúdo</a>
+
+      <main id="main-content" className="app-main" tabIndex="-1">
       {/* NAVEGAÇÃO: mostra o perfil ou o dashboard */}
       {currentPage === "profile" ? (
         <Profile />
@@ -849,6 +852,9 @@ async function saveGoal(goalData) {
           {/* Filtros */}
           <div className="filter-toggle">
             <button
+              type="button"
+              aria-expanded={showFilters}
+              aria-controls="transaction-filters"
               onClick={() => setShowFilters(!showFilters)}
             >
               {showFilters
@@ -858,10 +864,12 @@ async function saveGoal(goalData) {
           </div>
 
           {showFilters && (
+            <div id="transaction-filters">
             <FilterBar
               filtro={filtro}
               setFiltro={setFiltro}
             />
+            </div>
           )}
 
           {/* Transações + Painel lateral */}
@@ -906,7 +914,9 @@ async function saveGoal(goalData) {
 
                   <div className="loan-actions">
                     <button
+                      type="button"
                       className="loan-add"
+                      aria-label="Adicionar empréstimo"
                       onClick={() => {
                         setEditingLoan(null);
                         setLoanModalOpen(true);
@@ -1017,7 +1027,9 @@ async function saveGoal(goalData) {
 
                   <div className="loan-actions">
                     <button
+                      type="button"
                       className="loan-add"
+                      aria-label="Adicionar empréstimo"
                       onClick={() => {
                         setEditingScheduledBill(null);
                         setScheduledBillModalOpen(true);
@@ -1128,8 +1140,10 @@ async function saveGoal(goalData) {
           </div>
         </>
       )}
+      </main>
     </>
   );
 }
 
 export default App;
+

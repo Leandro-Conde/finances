@@ -291,3 +291,84 @@
     right: -90px;
   }
 }
+
+/* =========================================
+   ACESSIBILIDADE - PAINEL
+========================================= */
+
+.accessibility-panel {
+  max-height: min(80vh, 620px);
+  overflow-y: auto;
+}
+
+.accessibility-option {
+  gap: 10px;
+}
+
+.accessibility-option legend {
+  padding: 0 0 8px;
+  font-weight: 700;
+}
+
+.accessibility-control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.accessibility-control-row button,
+.accessibility-switch,
+.accessibility-reset {
+  width: auto;
+  min-width: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid #6d28d9;
+  border-radius: 8px;
+  background: #292039;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.accessibility-control-row button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.accessibility-switch {
+  min-width: 104px;
+  font-size: .82rem;
+}
+
+.accessibility-reset {
+  width: 100%;
+  margin-top: 16px;
+  background: #27272a;
+  border-color: #52525b;
+}
+
+.accessibility-keyboard-help {
+  margin-top: 14px !important;
+  font-size: .78rem !important;
+}
+
+.accessibility-panel button:focus-visible {
+  outline: 3px solid #facc15;
+  outline-offset: 3px;
+}
+
+@media (max-width: 480px) {
+  .accessibility-panel {
+    position: fixed;
+    top: 88px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-width: none;
+    max-height: calc(100vh - 110px);
+  }
+}
