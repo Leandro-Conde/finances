@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { supabase } from "../../services/supabase";
 import "../../styles/register.css";
@@ -8,13 +7,13 @@ function Register({ onBack }) {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
+    const [receberNotificacoes, setReceberNotificacoes] = useState(false);
     const [loading, setLoading] = useState(false);
 
     async function register() {
         const nomeLimpo = nome.trim();
         const emailLimpo = email.trim();
 
-        // Validações antes de ativar o carregamento.
         if (!nomeLimpo) {
             alert("Informe seu nome.");
             return;
@@ -45,6 +44,7 @@ function Register({ onBack }) {
                     data: {
                         full_name: nomeLimpo,
                         nome: nomeLimpo,
+                        receber_notificacoes: receberNotificacoes,
                     },
                 },
             });
@@ -106,6 +106,46 @@ function Register({ onBack }) {
                     disabled={loading}
                     autoComplete="email"
                 />
+
+                <label
+                    style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: "10px",
+                        margin: "8px 0 16px",
+                        color: "#d4d4d8",
+                        fontSize: "0.88rem",
+                        lineHeight: 1.5,
+                        cursor: loading ? "not-allowed" : "pointer",
+                    }}
+                >
+                    <input
+                        type="checkbox"
+                        checked={receberNotificacoes}
+                        onChange={(event) =>
+                            setReceberNotificacoes(event.target.checked)
+                        }
+                        disabled={loading}
+                        style={{
+                            width: "auto",
+                            marginTop: "3px",
+                            accentColor: "#8b5cf6",
+                        }}
+                    />
+
+                    <span>
+                        Quero receber notificações do Atlas Finance no meu Gmail.
+                        <small
+                            style={{
+                                display: "block",
+                                color: "#a1a1aa",
+                                marginTop: "3px",
+                            }}
+                        >
+                            Você poderá alterar essa preferência no seu perfil.
+                        </small>
+                    </span>
+                </label>
 
                 <input
                     type="password"

@@ -1,4 +1,3 @@
-
 import { supabase } from "./supabase";
 
 const LIMITE_PADRAO = 3000;
@@ -42,4 +41,54 @@ export async function saveSpendingLimit(userId, limite) {
     if (error) throw error;
 
     return valor;
+}
+
+export async function getNotificationPreference(userId, fallback = false) {
+    const { data, error } = await supabase
+        .from("user_settings")
+        .select("receber_notificacoes")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+    if (error) throw error;
+
+    if (data) {
+        return data.receber_notificacoes === true;
+    }
+
+    return fallback === true;
+}
+
+export async function getOrCreateNotificationPreference(userId, fallback = false) {
+    const { data, error } = await supabase
+        .from("user_settings")
+        .select("receber_notificacoes")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+    if (error) throw error;
+
+    if (data) {
+        return data.receber_notificacoes === true;
+    }
+
+    return await saveNotificationPreference(userId, fallback);
+}
+export async function saveNotificationPreference(userId, enabled) {
+    const { error } = await supabase
+        .from("user_settings")
+        .upsert(
+            {
+                user_id: userId,
+                receber_notificacoes: enabled === true,
+                updated_at: new Date().toISOString(),
+            },
+            {
+                onConflict: "user_id",
+            }
+        );
+
+    if (error) throw error;
+
+    return enabled === true;
 }

@@ -1,6 +1,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../services/supabase";
+import {
+  getNotificationPreference,
+  getOrCreateNotificationPreference,
+  saveNotificationPreference,
+} from "../services/userSettingsService";
 import "../styles/profile.css";
 
 const AVATAR_BUCKET = "avatars";
@@ -16,6 +21,8 @@ function Profile() {
   const [avatarPath, setAvatarPath] = useState("");
   const [tema, setTema] = useState("dark");
   const [idioma, setIdioma] = useState("pt-BR");
+  const [receberNotificacoes, setReceberNotificacoes] = useState(false);
+  const [savingNotifications, setSavingNotifications] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -40,6 +47,21 @@ function Profile() {
 
         const currentUser = data.user;
         const metadata = currentUser.user_metadata || {};
+        const hasSignupPreference = Object.prototype.hasOwnProperty.call(
+          metadata,
+          "receber_notificacoes"
+        );
+
+        let notificationPreference = false;
+
+        if (!currentUser.is_anonymous) {
+          notificationPreference = hasSignupPreference
+            ? await getOrCreateNotificationPreference(
+                currentUser.id,
+                metadata.receber_notificacoes === true
+              )
+            : await getNotificationPreference(currentUser.id);
+        }
         const savedPath = metadata.avatar_path || "";
 
         let signedUrl = "";
@@ -89,6 +111,7 @@ function Profile() {
         setAvatarUrl(signedUrl);
         setTema(savedTheme);
         setIdioma(savedLanguage);
+        setReceberNotificacoes(notificationPreference);
       } catch (error) {
         if (!cancelled) {
           setErrorMessage(
@@ -110,6 +133,25 @@ function Profile() {
   function clearMessages() {
     setMessage("");
     setErrorMessage("");
+  }
+  async function updateNotificationPreference(enabled) {
+    if (!user || user.is_anonymous || savingNotifications) return;
+
+    clearMessages();
+    setSavingNotifications(true);
+
+    try {
+      const saved = await saveNotificationPreference(user.id, enabled);
+
+      setReceberNotificacoes(saved);
+      setMessage("Preferência de notificações atualizada.");
+    } catch (error) {
+      setErrorMessage(
+        error.message || "Não foi possível atualizar sua preferência."
+      );
+    } finally {
+      setSavingNotifications(false);
+    }
   }
 
   async function saveProfile(event) {
@@ -491,6 +533,53 @@ function Profile() {
         </div>
       </section>
 
+      {!user?.is_anonymous && (
+        <section className="profile-card">
+          <div className="profile-section-heading">
+            <h3>Notificações</h3>
+            <p>Controle os avisos que deseja receber no seu Gmail.</p>
+          </div>
+
+          <div className="profile-preference">
+            <div>
+              <strong>Notificações por e-mail</strong>
+              <p>
+                E-mail vinculado: {user?.email || "Não disponível"}
+              </p>
+              <small>
+                Você poderá alterar essa escolha quando quiser.
+              </small>
+            </div>
+
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                cursor: savingNotifications ? "wait" : "pointer",
+                opacity: savingNotifications ? 0.6 : 1,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={receberNotificacoes}
+                onChange={(event) =>
+                  updateNotificationPreference(event.target.checked)
+                }
+                disabled={savingNotifications}
+                aria-label="Receber notificações por e-mail"
+              />
+              <span>
+                {savingNotifications
+                  ? "Salvando..."
+                  : receberNotificacoes
+                    ? "Ativadas"
+                    : "Desativadas"}
+              </span>
+            </label>
+          </div>
+        </section>
+      )}
       <section className="profile-card">
         <div className="profile-section-heading">
           <h3>Segurança</h3>
