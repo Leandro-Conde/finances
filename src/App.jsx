@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import GoalModal from "./components/GoalModal";
 import Profile from "./pages/Profile";
@@ -98,44 +98,105 @@ function App() {
 
 
   
-  async function loadTransactions() {
-    if (!user) return false;
-  
-    setFinancialDataLoaded(false);
-  
-    try {
-      const [
-        transactionsData,
-        balances,
-        chartHistoryData,
-      ] = await Promise.all([
-        getTransactions(user.id),
-        getPreservedFinancialBalances(user.id),
-        getPreservedChartHistory(user.id),
-      ]);
-  
-      setTransactions(transactionsData);
-      setSaldoBase(balances.saldoBase);
-      setInvestimentosBase(balances.investimentosBase);
-      setValorGuardadoUtilizadoBase(
-        Number(balances?.valorGuardadoUtilizadoBase ?? 0)
-      );
-  
-      setPreservedChartHistory(chartHistoryData);
-  
-      setFinancialDataLoaded(true);
-  
-      return true;
-    } catch (error) {
-      console.error("Erro ao carregar dados financeiros:", error);
-  
-      window.alert(
-        "Não foi possível carregar seus dados financeiros. Verifique sua conexão e tente novamente."
-      );
-  
-      return false;
+  async function loadTransactions(userId = user?.id) {
+    if (!userId || currentUserIdRef.current !== userId) {
+        return false;
     }
-  }
+
+    setFinancialDataLoaded(false);
+
+    try {
+        const [
+            transactionsData,
+            balances,
+            chartHistoryData,
+        ] = await Promise.all([
+            getTransactions(userId),
+            getPreservedFinancialBalances(userId),
+            getPreservedChartHistory(userId),
+        ]);
+
+        // Impede que uma resposta antiga sobrescreva a sessão atual.
+        if (currentUserIdRef.current !== userId) {
+            return false;
+        }
+
+        setTransactions(transactionsData);
+        setSaldoBase(balances.saldoBase);
+        setInvestimentosBase(balances.investimentosBase);
+
+        setValorGuardadoUtilizadoBase(
+            Number(balances?.valorGuardadoUtilizadoBase ?? 0)
+        );
+
+        setPreservedChartHistory(chartHistoryData);
+        setFinancialDataLoaded(true);
+
+        return true;
+    } catch (error) {
+        if (currentUserIdRef.current === userId) {
+            console.error("Erro ao carregar dados financeiros:", error);
+
+            window.alert(
+                "Não foi possível carregar seus dados financeiros. Verifique sua conexão e tente novamente."
+            );
+        }
+
+        return false;
+    }
+}
+
+async function loadLoans(userId = user?.id) {
+    if (!userId || currentUserIdRef.current !== userId) return;
+
+    const data = await getLoans(userId);
+
+    if (currentUserIdRef.current !== userId) return;
+
+    setLoans(data);
+}
+
+async function loadGoal(userId = user?.id) {
+    if (!userId || currentUserIdRef.current !== userId) return;
+
+    const data = await getGoal(userId);
+
+    if (currentUserIdRef.current !== userId) return;
+
+    setGoal(data);
+}
+
+async function loadUserSettings(userId = user?.id) {
+    if (!userId || currentUserIdRef.current !== userId) return;
+
+    try {
+        const limite = await getUserSettings(userId);
+
+        if (currentUserIdRef.current !== userId) return;
+
+        setLimiteGastos(limite);
+    } catch (error) {
+        if (currentUserIdRef.current === userId) {
+            console.error("Erro ao carregar configurações:", error);
+        }
+    }
+}
+
+async function loadScheduledBills(userId = user?.id) {
+    if (!userId || currentUserIdRef.current !== userId) return;
+
+    try {
+        const data = await getScheduledBills(userId);
+
+        if (currentUserIdRef.current !== userId) return;
+
+        setScheduledBills(data);
+    } catch (error) {
+        if (currentUserIdRef.current === userId) {
+            console.error("Erro ao carregar contas agendadas:", error);
+        }
+    }
+}
 
 
   // Controla a navegação entre o dashboard e o perfil.
@@ -278,6 +339,9 @@ if (valorUtilizado > valorDisponivel + 0.001) {
 }
 
   
+const currentUserIdRef = useRef(null);
+currentUserIdRef.current = user?.id ?? null;
+
 
   useEffect(() => {
     if (!user || !financialDataLoaded || cleaningHistory) {
@@ -330,31 +394,6 @@ if (valorUtilizado > valorDisponivel + 0.001) {
     cleaningHistory,
   ]);
 
-  async function loadLoans() {
-    if (!user) return;
-
-    const data = await getLoans(user.id);
-    setLoans(data);
-  }
-
-  async function loadGoal() {
-    if (!user) return;
-
-    const data = await getGoal(user.id);
-    setGoal(data);
-  }
-
-  async function loadUserSettings() {
-    if (!user) return;
-
-    try {
-      const limite = await getUserSettings(user.id);
-      setLimiteGastos(limite);
-    } catch (error) {
-      console.error("Erro ao carregar configurações:", error);
-    }
-  }
-
   async function handleSaveSpendingLimit(novoLimite) {
     if (!user) {
       throw new Error("Usuário não autenticado.");
@@ -366,17 +405,6 @@ if (valorUtilizado > valorDisponivel + 0.001) {
     );
 
     setLimiteGastos(limiteSalvo);
-  }
-
-  async function loadScheduledBills() {
-    if (!user) return;
-
-    try {
-      const data = await getScheduledBills(user.id);
-      setScheduledBills(data);
-    } catch (error) {
-      console.error("ERRO AO CARREGAR CONTAS:", error);
-    }
   }
 
   async function saveScheduledBill(bill) {
@@ -477,18 +505,51 @@ async function saveGoal(goalData) {
     setGoalModalOpen(true);
   }
 
-  // Verifica a sessão e acompanha o estado de autenticação.
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null);
-      setLoadingAuth(false);
-    });
-
-    
+ // 1. Controla a autenticação e acompanha mudanças de sessão.
 useEffect(() => {
-  if (!user || user.is_anonymous === true) {
-      return;
-  }
+  let mounted = true;
+  let authEventReceived = false;
+
+  const {
+      data: { subscription },
+  } = supabase.auth.onAuthStateChange((event, session) => {
+      authEventReceived = true;
+
+      if (!mounted) return;
+
+      setUser(session?.user ?? null);
+      setLoadingAuth(false);
+  });
+
+  supabase.auth.getSession()
+      .then(({ data, error }) => {
+          if (!mounted || authEventReceived) return;
+
+          if (error) {
+              console.error("Erro ao recuperar sessão:", error);
+          }
+
+          setUser(data.session?.user ?? null);
+          setLoadingAuth(false);
+      })
+      .catch((error) => {
+          if (!mounted || authEventReceived) return;
+
+          console.error("Erro ao verificar autenticação:", error);
+          setUser(null);
+          setLoadingAuth(false);
+      });
+
+  return () => {
+      mounted = false;
+      subscription.unsubscribe();
+  };
+}, []);
+
+
+// 2. Sincroniza o nome do usuário real com a tabela profiles.
+useEffect(() => {
+  if (!user || user.is_anonymous === true) return;
 
   let cancelled = false;
 
@@ -501,9 +562,7 @@ useEffect(() => {
           metadata.name ||
           "";
 
-      if (!nome.trim()) {
-          return;
-      }
+      if (!nome.trim()) return;
 
       try {
           const { error } = await supabase
@@ -529,7 +588,10 @@ useEffect(() => {
           }
       } catch (error) {
           if (!cancelled) {
-              console.error("Erro ao sincronizar perfil:", error);
+              console.error(
+                  "Erro ao sincronizar perfil:",
+                  error
+              );
           }
       }
   }
@@ -542,25 +604,57 @@ useEffect(() => {
 }, [user?.id]);
 
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user ?? null);
-      }
-    );
+// 3. Limpa os estados anteriores e carrega os dados da identidade atual.
+useEffect(() => {
+  const userId = user?.id;
 
-    return () => listener.subscription.unsubscribe();
-  }, []);
+  // Limpa dados financeiros e estados da sessão anterior.
+  setTransactions([]);
+  setSaldoBase(0);
+  setInvestimentosBase(0);
+  setValorGuardadoUtilizadoBase(0);
+  setPreservedChartHistory([]);
 
-  // Carrega os dados financeiros do usuário autenticado.
-  useEffect(() => {
-    if (user) {
-      loadTransactions();
-      loadLoans();
-      loadGoal();
-      loadScheduledBills();
-      loadUserSettings();
-    }
-  }, [user]);
+  setLoans([]);
+  setGoal(null);
+  setScheduledBills([]);
+
+  setLimiteGastos(3000);
+  setFinancialDataLoaded(false);
+
+  setCleanupCount(null);
+  setCleanupCountError("");
+  setCountingCleanup(false);
+
+  // Fecha modais e reseta estados de edição.
+  setIsModalOpen(false);
+  setEditingTransaction(null);
+
+  setLoanModalOpen(false);
+  setEditingLoan(null);
+
+  setGoalModalOpen(false);
+  setEditingGoal(null);
+
+  setScheduledBillModalOpen(false);
+  setEditingScheduledBill(null);
+
+  setCurrentPage("home");
+
+  if (!userId) return;
+
+  async function loadUserData() {
+      await Promise.all([
+          loadTransactions(userId),
+          loadLoans(userId),
+          loadGoal(userId),
+          loadScheduledBills(userId),
+          loadUserSettings(userId),
+      ]);
+  }
+
+  loadUserData();
+}, [user?.id]);
 
   async function removeTransaction(id) {
     try {
