@@ -484,6 +484,64 @@ async function saveGoal(goalData) {
       setLoadingAuth(false);
     });
 
+    
+useEffect(() => {
+  if (!user || user.is_anonymous === true) {
+      return;
+  }
+
+  let cancelled = false;
+
+  async function ensureProfile() {
+      const metadata = user.user_metadata || {};
+
+      const nome =
+          metadata.full_name ||
+          metadata.nome ||
+          metadata.name ||
+          "";
+
+      if (!nome.trim()) {
+          return;
+      }
+
+      try {
+          const { error } = await supabase
+              .from("profiles")
+              .upsert(
+                  {
+                      id: user.id,
+                      nome: nome.trim(),
+                  },
+                  {
+                      onConflict: "id",
+                      ignoreDuplicates: true,
+                  }
+              );
+
+          if (cancelled) return;
+
+          if (error) {
+              console.error(
+                  "Não foi possível sincronizar o perfil:",
+                  error
+              );
+          }
+      } catch (error) {
+          if (!cancelled) {
+              console.error("Erro ao sincronizar perfil:", error);
+          }
+      }
+  }
+
+  ensureProfile();
+
+  return () => {
+      cancelled = true;
+  };
+}, [user?.id]);
+
+
     const { data: listener } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setUser(session?.user ?? null);

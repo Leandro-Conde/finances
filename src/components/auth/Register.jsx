@@ -1,167 +1,149 @@
+
 import { useState } from "react";
 import { supabase } from "../../services/supabase";
-//import Logo from "../../components/Logo";/
-//import BrandLogo from "../../components/BrandLogo";/
-
 import "../../styles/register.css";
 
 function Register({ onBack }) {
-
     const [nome, setNome] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [loading, setLoading] = useState(false);
 
-
     async function register() {
+        const nomeLimpo = nome.trim();
+        const emailLimpo = email.trim();
 
-        setLoading(true);
-
-        if (!nome.trim()) {
-
+        // Validações antes de ativar o carregamento.
+        if (!nomeLimpo) {
             alert("Informe seu nome.");
             return;
+        }
 
+        if (!/^[A-Z0-9._%+-]+@gmail\.com$/i.test(emailLimpo)) {
+            alert("Utilize um endereço de email válido do Gmail (@gmail.com).");
+            return;
+        }
+
+        if (password.length < 6) {
+            alert("A senha precisa ter pelo menos 6 caracteres.");
+            return;
         }
 
         if (password !== confirmPassword) {
-
             alert("As senhas não conferem.");
             return;
-
         }
 
-        const { data, error } = await supabase.auth.signUp({
+        setLoading(true);
 
-            email,
-            password,
-
-        });
-
-        if (error) {
-
-            alert(error.message);
-            return;
-
-        }
-
-        if (data.user) {
-
-            const { error: profileError } = await supabase
-
-            .from("profiles")
-        
-            .insert({
-        
-                id: data.user.id,
-        
-                nome,
-        
+        try {
+            const { data, error } = await supabase.auth.signUp({
+                email: emailLimpo,
+                password,
+                options: {
+                    data: {
+                        full_name: nomeLimpo,
+                        nome: nomeLimpo,
+                    },
+                },
             });
-        
-        if (profileError) {
-        
-            console.error(profileError);
-        
+
+            if (error) {
+                console.error("Erro no cadastro:", error);
+                alert(error.message);
+                return;
+            }
+
+            if (!data.user) {
+                throw new Error("Não foi possível criar sua conta.");
+            }
+
+            if (data.session) {
+                alert("Conta criada com sucesso!");
+            } else {
+                alert(
+                    "Cadastro iniciado! Verifique sua caixa de entrada do Gmail para confirmar seu endereço antes de entrar."
+                );
+            }
+
+            onBack();
+        } catch (error) {
+            console.error("Erro inesperado no cadastro:", error);
+            alert(
+                error.message ||
+                "Não foi possível criar sua conta. Tente novamente."
+            );
+        } finally {
+            setLoading(false);
         }
-
-        }
-
-        alert("Conta criada com sucesso.");
-
-        setLoading(false);
-
-        onBack();
-
     }
 
     return (
-
         <div className="register-page">
-
-
             <div className="register-card">
-
                 <h1>Criar Conta</h1>
 
                 <p>
-
                     Crie sua conta no Atlas Finance.
-
                 </p>
 
                 <input
-
+                    type="text"
                     placeholder="Nome"
-
                     value={nome}
-
-                    onChange={(e)=>setNome(e.target.value)}
-
+                    onChange={(event) => setNome(event.target.value)}
+                    maxLength={80}
+                    disabled={loading}
+                    autoComplete="name"
                 />
 
                 <input
-
-                    placeholder="Email"
-
+                    type="email"
+                    placeholder="Email do Gmail"
                     value={email}
-
-                    onChange={(e)=>setEmail(e.target.value)}
-
+                    onChange={(event) => setEmail(event.target.value)}
+                    disabled={loading}
+                    autoComplete="email"
                 />
 
                 <input
-
                     type="password"
-
                     placeholder="Senha"
-
                     value={password}
-
-                    onChange={(e)=>setPassword(e.target.value)}
-
+                    onChange={(event) => setPassword(event.target.value)}
+                    disabled={loading}
+                    autoComplete="new-password"
                 />
 
                 <input
-
                     type="password"
-
                     placeholder="Confirmar senha"
-
                     value={confirmPassword}
-
-                    onChange={(e)=>setConfirmPassword(e.target.value)}
-
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    disabled={loading}
+                    autoComplete="new-password"
                 />
 
                 <button
+                    type="button"
                     onClick={register}
                     disabled={loading}
                 >
-
                     {loading ? "Criando..." : "Criar Conta"}
-
                 </button>
 
                 <button
-
+                    type="button"
                     className="register-back"
-
                     onClick={onBack}
-
+                    disabled={loading}
                 >
-
                     Voltar
-
                 </button>
-
             </div>
-
         </div>
-
     );
-
 }
 
 export default Register;

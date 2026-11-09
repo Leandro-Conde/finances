@@ -1,0 +1,8657 @@
+RELATÓRIO DE ACESSIBILIDADE - ATLAS FINANCE
+
+
+==================================================
+ARQUIVO: src\App.jsx
+==================================================
+
+import { useEffect, useState } from "react";
+
+import GoalModal from "./components/GoalModal";
+import Profile from "./pages/Profile";
+
+import {
+  getScheduledBills,
+  createScheduledBill,
+  updateScheduledBill,
+  deleteScheduledBill,
+} from "./services/scheduledBillService";
+
+import {
+  getGoal,
+  createGoal,
+  updateGoal,
+} from "./services/goalService";
+
+import {
+  getLoans,
+  getLoanById,
+  createLoan,
+  deleteLoan,
+  markLoanAsPaid,
+  updateLoan,
+} from "./services/loanService";
+
+import {
+  getTransactions,
+  deleteTransaction,
+  getPreservedFinancialBalances,
+  getPreservedChartHistory,
+  cleanTransactionHistory,
+  countTransactionsToClean,
+} from "./services/transactionService";
+
+import {
+  getUserSettings,
+  saveSpendingLimit,
+} from "./services/userSettingsService";
+
+import LoanList from "./components/LoanList";
+import LoanModal from "./components/LoanModal";
+import Header from "./components/Header";
+import TransactionList from "./components/TransactionList";
+import Modal from "./components/Modal";
+import ModalWizard from "./components/modal/ModalWizard";
+import Home from "./components/Home";
+import FilterBar from "./components/FilterBar";
+import Login from "./components/auth/Login";
+import ScheduledBillModal from "./components/ScheduledBillModal";
+
+import "./styles/dashboard.css";
+
+import { supabase } from "./services/supabase";
+
+function App() {
+  const [transactions, setTransactions] = useState([]);
+  const [saldoBase, setSaldoBase] = useState(0);
+  const [investimentosBase, setInvestimentosBase] = useState(0);
+  const [financialDataLoaded, setFinancialDataLoaded] = useState(false);
+  const [cleaningHistory, setCleaningHistory] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState(null);
+
+  const [cleanupPeriod, setCleanupPeriod] = useState("3");
+  const [cleanupCount, setCleanupCount] = useState(null);
+  const [countingCleanup, setCountingCleanup] = useState(false);
+  const [cleanupCountError, setCleanupCountError] = useState("");
+
+  const [showFilters, setShowFilters] = useState(false);
+  const [filtro, setFiltro] = useState("Todos");
+
+  const [user, setUser] = useState(null);
+  const [loadingAuth, setLoadingAuth] = useState(true);
+
+  const [loans, setLoans] = useState([]);
+  const [loanModalOpen, setLoanModalOpen] = useState(false);
+  const [editingLoan, setEditingLoan] = useState(null);
+
+  const [goal, setGoal] = useState(null);
+  const [goalModalOpen, setGoalModalOpen] = useState(false);
+  const [editingGoal, setEditingGoal] = useState(null);
+
+  const [scheduledBills, setScheduledBills] = useState([]);
+  const [scheduledBillModalOpen, setScheduledBillModalOpen] = useState(false);
+  const [editingScheduledBill, setEditingScheduledBill] = useState(null);
+
+  const [showLoans, setShowLoans] = useState(true);
+  const [showScheduledBills, setShowScheduledBills] = useState(true);
+  const [showTransactions, setShowTransactions] = useState(true);
+
+  const [limiteGastos, setLimiteGastos] = useState(3000); 
+  const [valorGuardadoUtilizadoBase, setValorGuardadoUtilizadoBase] = useState(0);
+
+  const [preservedChartHistory, setPreservedChartHistory] = useState([]);
+
+
+  
+  async function loadTransactions() {
+    if (!user) return false;
+  
+    setFinancialDataLoaded(false);
+  
+    try {
+      const [
+        transactionsData,
+        balances,
+        chartHistoryData,
+      ] = await Promise.all([
+        getTransactions(user.id),
+        getPreservedFinancialBalances(user.id),
+        getPreservedChartHistory(user.id),
+      ]);
+  
+      setTransactions(transactionsData);
+      setSaldoBase(balances.saldoBase);
+      setInvestimentosBase(balances.investimentosBase);
+      setValorGuardadoUtilizadoBase(
+        Number(balances?.valorGuardadoUtilizadoBase ?? 0)
+      );
+  
+      setPreservedChartHistory(chartHistoryData);
+  
+      setFinancialDataLoaded(true);
+  
+      return true;
+    } catch (error) {
+      console.error("Erro ao carregar dados financeiros:", error);
+  
+      window.alert(
+        "Não foi possível carregar seus dados financeiros. Verifique sua conexão e tente novamente."
+      );
+  
+      return false;
+    }
+  }
+
+
+  // Controla a navegação entre o dashboard e o perfil.
+  const [currentPage, setCurrentPage] = useState("home");
+
+  async function removeLoan(id) {
+    if (!confirm("Excluir empréstimo?")) return;
+
+    await deleteLoan(id);
+    await loadLoans();
+  }
+
+  async function payLoan(id) {
+    const loan = await getLoanById(id);
+
+    await supabase.from("transactions").insert({
+      user_id: user.id,
+      tipo: loan.tipo === "receber" ? "entrada" : "saida",
+      categoria: "Empréstimos",
+      descricao:
+        loan.tipo === "receber"
+          ? `Recebido de ${loan.pessoa}`
+          : `Pagamento para ${loan.pessoa}`,
+      valor: Number(loan.valor),
+      data: new Date().toISOString().slice(0, 10),
+      observacao: loan.descricao,
+    });
+
+    await markLoanAsPaid(id);
+
+    await loadTransactions();
+    await loadLoans();
+  }
+
+  async function saveLoan(loan) {
+    if (loan.id) {
+      await updateLoan(loan.id, loan);
+    } else {
+      await createLoan({
+        ...loan,
+        valor: Number(loan.valor),
+        status: loan.status,
+        user_id: user.id,
+      });
+    }
+
+    await loadLoans();
+
+    setEditingLoan(null);
+    setLoanModalOpen(false);
+  }
+
+  
+
+ 
+async function handleUseSavedMoney(valor) {
+  if (!user) {
+    throw new Error("Você precisa estar autenticado.");
+  }
+
+  if (!goal) {
+    throw new Error("Cadastre uma meta antes de usar o valor guardado.");
+  }
+
+  const valorUtilizado = Number(valor);
+
+  if (!Number.isFinite(valorUtilizado) || valorUtilizado <= 0) {
+    throw new Error("Informe um valor válido.");
+  }
+
+  
+/* ALTERAÇÃO: calcular o total já utilizado */
+
+const totalJaUtilizado =
+  Number(valorGuardadoUtilizadoBase || 0) +
+  transactions
+    .filter(
+      (item) =>
+        item.tipo === "saida" &&
+        item.descricao === "Valor guardado usado"
+    )
+    .reduce(
+      (total, item) => total + Number(item.valor || 0),
+      0
+    );
+
+
+/* ALTERAÇÃO: considerar o saldo inicial de investimentos
+   e os investimentos registrados no histórico */
+const totalInvestimentosGuardados =
+  Number(investimentosBase || 0) +
+  transactions
+    .filter((item) => item.tipo === "investimento")
+    .reduce(
+      (total, item) => total + Number(item.valor || 0),
+      0
+    );
+
+/* ALTERAÇÃO: usar a mesma regra de cálculo do Dashboard */
+const valorDisponivel = Math.max(
+  0,
+  Number(goal.valor_inicial || 0) +
+    totalInvestimentosGuardados -
+    totalJaUtilizado
+);
+
+/* ALTERAÇÃO: validar contra o saldo realmente disponível */
+if (valorUtilizado > valorDisponivel + 0.001) {
+  throw new Error(
+    "O valor informado ultrapassa o dinheiro guardado disponível."
+  );
+}
+
+
+  const hoje = new Date();
+  const dataLocal = [
+    hoje.getFullYear(),
+    String(hoje.getMonth() + 1).padStart(2, "0"),
+    String(hoje.getDate()).padStart(2, "0"),
+  ].join("-");
+
+  const { error } = await supabase
+    .from("transactions")
+    .insert({
+      user_id: user.id,
+      tipo: "saida",
+      categoria: "Valor guardado",
+      descricao: "Valor guardado usado",
+      valor: valorUtilizado,
+      data: dataLocal,
+      observacao: "Utilização de dinheiro guardado.",
+    });
+
+  if (error) {
+    console.error("Erro ao utilizar valor guardado:", error);
+    throw new Error("Não foi possível registrar a utilização no Supabase.");
+  }
+
+  await loadTransactions();
+}
+
+  
+
+  useEffect(() => {
+    if (!user || !financialDataLoaded || cleaningHistory) {
+      setCleanupCount(null);
+      return;
+    }
+  
+    let cancelled = false;
+  
+    async function updateCleanupCount() {
+      setCountingCleanup(true);
+      setCleanupCount(null);
+      setCleanupCountError("");
+  
+      try {
+        const count = await countTransactionsToClean(
+          user.id,
+          cleanupPeriod === "todos"
+            ? "todos"
+            : Number(cleanupPeriod)
+        );
+  
+        if (!cancelled) {
+          setCleanupCount(count);
+        }
+      } catch (error) {
+        console.error("Erro ao contar transações:", error);
+  
+        if (!cancelled) {
+          setCleanupCountError(
+            "Não foi possível calcular a quantidade. Tente novamente."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setCountingCleanup(false);
+        }
+      }
+    }
+  
+    updateCleanupCount();
+  
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    user?.id,
+    financialDataLoaded,
+    cleanupPeriod,
+    cleaningHistory,
+  ]);
+
+  async function loadLoans() {
+    if (!user) return;
+
+    const data = await getLoans(user.id);
+    setLoans(data);
+  }
+
+  async function loadGoal() {
+    if (!user) return;
+
+    const data = await getGoal(user.id);
+    setGoal(data);
+  }
+
+  async function loadUserSettings() {
+    if (!user) return;
+
+    try {
+      const limite = await getUserSettings(user.id);
+      setLimiteGastos(limite);
+    } catch (error) {
+      console.error("Erro ao carregar configurações:", error);
+    }
+  }
+
+  async function handleSaveSpendingLimit(novoLimite) {
+    if (!user) {
+      throw new Error("Usuário não autenticado.");
+    }
+
+    const limiteSalvo = await saveSpendingLimit(
+      user.id,
+      novoLimite
+    );
+
+    setLimiteGastos(limiteSalvo);
+  }
+
+  async function loadScheduledBills() {
+    if (!user) return;
+
+    try {
+      const data = await getScheduledBills(user.id);
+      setScheduledBills(data);
+    } catch (error) {
+      console.error("ERRO AO CARREGAR CONTAS:", error);
+    }
+  }
+
+  async function saveScheduledBill(bill) {
+    if (bill.id) {
+      await updateScheduledBill(bill.id, {
+        nome: bill.nome,
+        categoria: bill.categoria,
+        valor: Number(bill.valor),
+        tipo: bill.tipo,
+        vencimento: bill.vencimento,
+        recorrencia: bill.recorrencia,
+        dias_lembrete: Number(bill.dias_lembrete),
+        ativo: bill.ativo,
+      });
+    } else {
+      await createScheduledBill({
+        nome: bill.nome,
+        categoria: bill.categoria,
+        valor: Number(bill.valor),
+        tipo: bill.tipo,
+        vencimento: bill.vencimento,
+        recorrencia: bill.recorrencia,
+        dias_lembrete: Number(bill.dias_lembrete),
+        ativo: bill.ativo,
+        user_id: user.id,
+      });
+    }
+
+    await loadScheduledBills();
+
+    setScheduledBillModalOpen(false);
+    setEditingScheduledBill(null);
+  }
+
+  async function removeScheduledBill(id) {
+    if (!confirm("Excluir esta conta agendada?")) return;
+
+    try {
+      await deleteScheduledBill(id);
+      await loadScheduledBills();
+    } catch (error) {
+      console.error("ERRO AO EXCLUIR CONTA:", error);
+    }
+  }
+
+ 
+async function saveGoal(goalData) {
+  if (!user) {
+    throw new Error("Usuário não autenticado.");
+  }
+
+  const dadosMeta = {
+    nome: "Investimentos/Guardados",
+    valor_meta: Number(goalData.valor_meta),
+    valor_inicial: Number(goalData.valor_inicial || 0),
+    prazo_meses: Number(goalData.prazo_meses),
+  };
+
+  if (
+    !Number.isFinite(dadosMeta.valor_meta) ||
+    dadosMeta.valor_meta <= 0
+  ) {
+    throw new Error("O valor-alvo precisa ser maior que zero.");
+  }
+
+  if (
+    !Number.isFinite(dadosMeta.valor_inicial) ||
+    dadosMeta.valor_inicial < 0
+  ) {
+    throw new Error("O valor inicial não pode ser negativo.");
+  }
+
+  if (
+    !Number.isInteger(dadosMeta.prazo_meses) ||
+    dadosMeta.prazo_meses <= 0
+  ) {
+    throw new Error("O prazo precisa ser um número inteiro de meses.");
+  }
+
+  if (goalData.id) {
+    await updateGoal(goalData.id, dadosMeta);
+  } else {
+    await createGoal({
+      ...dadosMeta,
+      user_id: user.id,
+    });
+  }
+
+  await loadGoal();
+
+  setGoalModalOpen(false);
+  setEditingGoal(null);
+}
+
+
+  function handleEditGoalFromDashboard() {
+    setEditingGoal(goal);
+    setGoalModalOpen(true);
+  }
+
+  // Verifica a sessão e acompanha o estado de autenticação.
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null);
+      setLoadingAuth(false);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  // Carrega os dados financeiros do usuário autenticado.
+  useEffect(() => {
+    if (user) {
+      loadTransactions();
+      loadLoans();
+      loadGoal();
+      loadScheduledBills();
+      loadUserSettings();
+    }
+  }, [user]);
+
+  async function removeTransaction(id) {
+    try {
+      await deleteTransaction(id);
+      await loadTransactions();
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  
+
+  async function handleCleanTransactionHistory(months = null) {
+    if (!user) {
+      window.alert("Você precisa estar autenticado.");
+      return;
+    }
+  
+    if (cleaningHistory || !financialDataLoaded) {
+      window.alert("Aguarde o carregamento dos dados financeiros.");
+      return;
+    }
+  
+    if (
+      months !== null &&
+      (!Number.isInteger(months) || months < 1)
+    ) {
+      window.alert("Selecione um período válido.");
+      return;
+    }
+  
+    const confirmation =
+      months === null
+        ? "Todo o histórico será apagado. O saldo e os investimentos acumulados serão preservados. Deseja continuar?"
+        : `Serão apagadas as transações anteriores ao limite de ${months} mês(es). O saldo e os investimentos acumulados serão preservados. Deseja continuar?`;
+  
+    if (!window.confirm(confirmation)) return;
+  
+    setCleaningHistory(true);
+  
+    try {
+      const result = await cleanTransactionHistory(months);
+
+      console.log("Resultado da limpeza:", result);
+  
+      // A exclusão já ocorreu no banco. Agora atualizamos a tela.
+      const transactionsReloaded = await loadTransactions();
+  
+      await loadGoal();
+  
+      if (!transactionsReloaded) {
+        window.alert(
+          `A limpeza foi executada: ${result?.deleted_count ?? 0} transação(ões) removida(s). Porém, não foi possível atualizar os dados na tela. Recarregue o aplicativo.`
+        );
+        return result;
+      }
+  
+      window.alert(
+        `Limpeza concluída! ${result?.deleted_count ?? 0} transação(ões) removida(s).`
+      );
+  
+      return result;
+    } catch (error) {
+      console.error("Erro ao limpar histórico:", error);
+  
+      window.alert(
+        "Não foi possível confirmar a limpeza. Confira os dados no Supabase antes de tentar novamente."
+      );
+  
+      return null;
+    } finally {
+      setCleaningHistory(false);
+    }
+  }
+  
+
+
+  function editTransaction(transaction) {
+    setEditingTransaction(transaction);
+    setIsModalOpen(true);
+  }
+
+  const filteredTransactions =
+    filtro === "Todos"
+      ? transactions
+      : transactions.filter((item) => {
+          if (filtro === "Entradas") {
+            return item.tipo === "entrada";
+          }
+
+          if (filtro === "Saídas") {
+            return item.tipo === "saida";
+          }
+
+          if (filtro === "Investimentos") {
+            return item.tipo === "investimento";
+          }
+
+          if (filtro === "Renda Passiva") {
+            return item.tipo === "renda_passiva";
+          }
+
+          return true;
+        });
+
+  if (loadingAuth) {
+    return <h2>Carregando...</h2>;
+  }
+
+  if (!user) {
+    return <Login />;
+  }
+
+  const totalInvestimentos =
+  Number(investimentosBase || 0) +
+  transactions
+    .filter((item) => item.tipo === "investimento")
+    .reduce(
+      (total, item) => total + Number(item.valor || 0),
+      0
+    );
+
+
+    
+    const totalValorGuardadoUtilizado =
+    Number(valorGuardadoUtilizadoBase || 0) +
+    transactions
+      .filter(
+        (item) =>
+          item.tipo === "saida" &&
+          item.descricao === "Valor guardado usado"
+      )
+      .reduce(
+        (total, item) => total + Number(item.valor || 0),
+        0
+      );
+
+  
+  const valorAtualMeta = goal
+    ? Math.max(
+        0,
+        Number(goal.valor_inicial || 0) +
+          totalInvestimentos -
+          totalValorGuardadoUtilizado
+      )
+    : 0;
+  
+  const percentualMeta =
+    goal && Number(goal.valor_meta) > 0
+      ? Math.min(
+          (valorAtualMeta / Number(goal.valor_meta)) * 100,
+          100
+        )
+      : 0;
+  
+  /* ALTERAÇÃO: removida a segunda declaração duplicada de percentualMeta */
+  
+  return (
+    <>
+      {/* CABEÇALHO: permanece visível nas duas telas */}
+      <Header
+        currentPage={currentPage}
+        onOpenProfile={() => setCurrentPage("profile")}
+        onGoHome={() => setCurrentPage("home")}
+      />
+  
+      {/* NAVEGAÇÃO: mostra o perfil ou o dashboard */}
+      {currentPage === "profile" ? (
+        <Profile />
+      ) : (
+        <>
+          {/* Modal Nova Transação / Edição */}
+          <Modal
+            isOpen={isModalOpen}
+            onClose={() => {
+              setIsModalOpen(false);
+              setEditingTransaction(null);
+            }}
+          >
+            <ModalWizard
+              user={user}
+              transactions={transactions}
+              setTransactions={setTransactions}
+              onClose={() => {
+                setIsModalOpen(false);
+                setEditingTransaction(null);
+                loadTransactions();
+              }}
+            />
+          </Modal>
+
+          {/* Modal Empréstimo */}
+          <Modal
+            isOpen={loanModalOpen}
+            onClose={() => {
+              setLoanModalOpen(false);
+              setEditingLoan(null);
+            }}
+          >
+            <LoanModal
+              loan={editingLoan}
+              onClose={() => {
+                setLoanModalOpen(false);
+                setEditingLoan(null);
+              }}
+              onSave={saveLoan}
+            />
+          </Modal>
+
+          {/* Modal Meta */}
+          <Modal
+            isOpen={goalModalOpen}
+            onClose={() => {
+              setGoalModalOpen(false);
+              setEditingGoal(null);
+            }}
+          >
+            <GoalModal
+              goal={editingGoal}
+              onClose={() => {
+                setGoalModalOpen(false);
+                setEditingGoal(null);
+              }}
+              onSave={saveGoal}
+            />
+          </Modal>
+
+          {/* Modal Contas Agendadas */}
+          <Modal
+            isOpen={scheduledBillModalOpen}
+            onClose={() => {
+              setScheduledBillModalOpen(false);
+              setEditingScheduledBill(null);
+            }}
+          >
+            <ScheduledBillModal
+              bill={editingScheduledBill}
+              onClose={() => {
+                setScheduledBillModalOpen(false);
+                setEditingScheduledBill(null);
+              }}
+              onSave={saveScheduledBill}
+            />
+          </Modal>
+
+          {/* Ações */}
+          <div className="actions">
+            <button
+              className="new-transaction-btn"
+              onClick={() => {
+                setEditingTransaction(null);
+                setIsModalOpen(true);
+              }}
+            >
+              ➕ Nova Transação
+            </button>
+
+            <details className="history-cleanup panel-card">
+  <summary className="history-cleanup-summary">
+    <span>🗂️ Gerenciar histórico</span>
+    <span className="history-cleanup-arrow">⌄</span>
+  </summary>
+
+  <div className="history-cleanup-content">
+    <p>
+      Remova transações antigas sem perder o saldo e os investimentos
+      acumulados.
+    </p>
+
+    <label htmlFor="cleanup-period">
+      Período do histórico
+    </label>
+
+    <select
+      id="cleanup-period"
+      value={cleanupPeriod}
+      onChange={(event) => setCleanupPeriod(event.target.value)}
+      disabled={cleaningHistory || countingCleanup}
+    >
+      <option value="1">Mais de 1 mês</option>
+      <option value="3">Mais de 3 meses</option>
+      <option value="6">Mais de 6 meses</option>
+      <option value="12">Mais de 12 meses</option>
+      <option value="todos">Todo o histórico</option>
+    </select>
+
+    <p aria-live="polite">
+      {countingCleanup
+        ? "Calculando transações..."
+        : cleanupCountError
+          ? cleanupCountError
+          : cleanupCount === null
+            ? "Aguardando dados financeiros..."
+            : `${cleanupCount} transação(ões) serão removidas.`}
+    </p>
+
+    <button
+      type="button"
+      className="history-cleanup-btn"
+      disabled={
+        cleaningHistory ||
+        countingCleanup ||
+        !financialDataLoaded ||
+        cleanupCount === null ||
+        cleanupCountError !== "" ||
+        cleanupCount === 0
+      }
+      onClick={() =>
+        handleCleanTransactionHistory(
+          cleanupPeriod === "todos"
+            ? null
+            : Number(cleanupPeriod)
+        )
+      }
+    >
+      {cleaningHistory ? "Limpando..." : "Limpar histórico"}
+    </button>
+
+    <small>
+      A operação não pode ser desfeita pela interface. Confira a
+      seleção antes de confirmar.
+    </small>
+  </div>
+</details>
+          </div>
+
+          {/* Dashboard */}
+          <Home
+      transactions={filteredTransactions}
+      allTransactions={transactions}
+      loans={loans}
+      scheduledBills={scheduledBills}
+      goal={goal}
+      limiteGastos={limiteGastos}
+      onSalvarLimiteGastos={handleSaveSpendingLimit}
+      onUsarValorGuardado={handleUseSavedMoney}
+      onEditarMeta={handleEditGoalFromDashboard}
+      saldoBase={saldoBase}
+      investimentosBase={investimentosBase}
+      financialDataLoaded={financialDataLoaded}
+      valorGuardadoUtilizadoBase={valorGuardadoUtilizadoBase}
+      preservedChartHistory={preservedChartHistory}
+    />
+          {/* Filtros */}
+          <div className="filter-toggle">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              {showFilters
+                ? "🔽 Esconder Filtros"
+                : "▶ Mostrar Filtros"}
+            </button>
+          </div>
+
+          {showFilters && (
+            <FilterBar
+              filtro={filtro}
+              setFiltro={setFiltro}
+            />
+          )}
+
+          {/* Transações + Painel lateral */}
+          <div className="transactions-container">
+            {/* Últimas Transações */}
+            <div className="panel-card">
+              <div className="panel-header">
+                <h3>Últimas Transações</h3>
+
+                {filteredTransactions.length >= 2 && (
+                  <button
+                    className="loan-toggle"
+                    onClick={() =>
+                      setShowTransactions(!showTransactions)
+                    }
+                    title={
+                      showTransactions
+                        ? "Recolher lista"
+                        : "Expandir lista"
+                    }
+                  >
+                    {showTransactions ? "Fechar" : "Abrir"}
+                  </button>
+                )}
+              </div>
+
+              {(showTransactions ||
+                filteredTransactions.length < 2) && (
+                <TransactionList
+                  transactions={filteredTransactions}
+                  deleteTransaction={removeTransaction}
+                  editTransaction={editTransaction}
+                />
+              )}
+            </div>
+
+            <div className="side-panel">
+              {/* Empréstimos */}
+              <div className="panel-card">
+                <div className="panel-header">
+                  <h3>Empréstimos</h3>
+
+                  <div className="loan-actions">
+                    <button
+                      className="loan-add"
+                      onClick={() => {
+                        setEditingLoan(null);
+                        setLoanModalOpen(true);
+                      }}
+                      title="Adicionar empréstimo"
+                    >
+                      +
+                    </button>
+
+                    {loans.length >= 2 && (
+                      <button
+                        className="loan-toggle"
+                        onClick={() => setShowLoans(!showLoans)}
+                        title={
+                          showLoans
+                            ? "Recolher lista"
+                            : "Expandir lista"
+                        }
+                      >
+                        {showLoans ? "Fechar" : "Abrir"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {showLoans &&
+                  (loans.length === 0 ? (
+                    <p>Nenhum empréstimo cadastrado.</p>
+                  ) : (
+                    <LoanList
+                      loans={loans}
+                      onDelete={removeLoan}
+                      onPay={payLoan}
+                      onEdit={(loan) => {
+                        setEditingLoan(loan);
+                        setLoanModalOpen(true);
+                      }}
+                    />
+                  ))}
+              </div>
+
+              {/* Meta Mensal */}
+              <div className="panel-card">
+              <div className="goal-header">
+              <h3> Investimentos/Guardados </h3>
+              </div>
+
+                {goal ? (
+                  <>
+                    <p className="goal-name">
+                      <strong>{goal.nome}</strong>
+                    </p>
+
+                    <div className="goal-values">
+                      <strong className="goal-current">
+                        {valorAtualMeta.toLocaleString("pt-BR", {
+                          style: "currency",
+                          currency: "BRL",
+                        })}
+                      </strong>
+
+                      <span>
+                        {" / "}
+                        {Number(goal.valor_meta).toLocaleString(
+                          "pt-BR",
+                          {
+                            style: "currency",
+                            currency: "BRL",
+                          }
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="goal-percentage">
+                      {percentualMeta.toFixed(0)}%
+                    </div>
+
+                    <div className="goal-bar">
+                      <div
+                        className="goal-progress"
+                        style={{
+                          width: `${percentualMeta}%`,
+                        }}
+                      />
+                    </div>
+
+                    <p className="goal-status">
+                      {valorAtualMeta >= Number(goal.valor_meta)
+                        ? "🎉 Meta atingida!"
+                        : `Faltam ${(
+                            Number(goal.valor_meta) -
+                            valorAtualMeta
+                          ).toLocaleString("pt-BR", {
+                            style: "currency",
+                            currency: "BRL",
+                          })}`}
+                    </p>
+                  </>
+                ) : (
+                  <small>Nenhuma meta cadastrada.</small>
+                )}
+              </div>
+
+              {/* Próximos Eventos */}
+              <div className="panel-card">
+                <div className="panel-header">
+                  <h3>📅 Próximos Eventos</h3>
+
+                  <div className="loan-actions">
+                    <button
+                      className="loan-add"
+                      onClick={() => {
+                        setEditingScheduledBill(null);
+                        setScheduledBillModalOpen(true);
+                      }}
+                    >
+                      +
+                    </button>
+
+                    {scheduledBills.length >= 2 && (
+                      <button
+                        className="loan-toggle"
+                        onClick={() =>
+                          setShowScheduledBills(
+                            !showScheduledBills
+                          )
+                        }
+                        title={
+                          showScheduledBills
+                            ? "Recolher lista"
+                            : "Expandir lista"
+                        }
+                      >
+                        {showScheduledBills ? "Fechar" : "Abrir"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {scheduledBills.length === 0 ? (
+                  <p>Nenhuma conta agendada.</p>
+                ) : (
+                  (showScheduledBills ||
+                    scheduledBills.length < 2) && (
+                    <div className="scheduled-bills-list">
+                      {scheduledBills.map((bill) => {
+                        const hoje = new Date();
+
+                        const vencimento = new Date(
+                          `${bill.vencimento}T00:00:00`
+                        );
+
+                        const diferenca = Math.ceil(
+                          (vencimento - hoje) /
+                            (1000 * 60 * 60 * 24)
+                        );
+
+                        return (
+                          <div
+                            className="scheduled-bill-item"
+                            key={bill.id}
+                          >
+                            <div className="scheduled-bill-info">
+                              <strong>{bill.nome}</strong>
+                              <span>{bill.categoria}</span>
+
+                              <small>
+                                Vence em{" "}
+                                {diferenca <= 0
+                                  ? "hoje"
+                                  : `${diferenca} dia${
+                                      diferenca > 1 ? "s" : ""
+                                    }`}
+                              </small>
+                            </div>
+
+                            <div className="scheduled-bill-right">
+                              <strong className="scheduled-bill-value">
+                                {Number(bill.valor).toLocaleString(
+                                  "pt-BR",
+                                  {
+                                    style: "currency",
+                                    currency: "BRL",
+                                  }
+                                )}
+                              </strong>
+
+                              <div className="scheduled-bill-actions">
+                                <button
+                                  className="scheduled-bill-edit"
+                                  onClick={() => {
+                                    setEditingScheduledBill(bill);
+                                    setScheduledBillModalOpen(true);
+                                  }}
+                                  title="Editar conta"
+                                >
+                                  ✏️
+                                </button>
+
+                                <button
+                                  className="scheduled-bill-delete"
+                                  onClick={() =>
+                                    removeScheduledBill(bill.id)
+                                  }
+                                  title="Excluir conta"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+export default App;
+
+
+
+==================================================
+ARQUIVO: src\components\auth\ForgotPassword.jsx
+==================================================
+
+
+==================================================
+ARQUIVO: src\components\auth\Login.jsx
+==================================================
+import { useState } from "react";
+import { supabase } from "../../services/supabase";
+import Register from "./Register";
+import Logo from "../common/Logo";
+
+import "../../styles/login.css";
+import BrandLogo from "../BrandLogo";
+
+
+
+<BrandLogo
+  type="atlas"
+  size={90}
+  className="auth-logo"
+/>
+
+function Login() {
+
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [showRegister, setShowRegister] = useState(false);
+
+    async function login() {
+
+        setLoading(true);
+    
+        const { error } = await supabase.auth.signInWithPassword({
+    
+            email,
+            password,
+    
+        });
+    
+        setLoading(false);
+    
+        if (error) {
+    
+            alert(error.message);
+            return;
+    
+        }
+    
+    }
+
+
+    if (showRegister) {
+
+        return (
+    
+            <Register
+    
+                onBack={() => setShowRegister(false)}
+    
+            />
+    
+        );
+    
+    }
+
+    return (
+
+        
+
+        <div className="login-page">
+
+                <Logo
+
+                variant="atlas"
+
+                size={110}
+
+                />
+
+            <div className="login-card">
+
+                <h1>Atlas Finance</h1>
+
+                <p>Organize sua vida financeira.</p>
+
+                <input
+
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+
+                />
+
+                <input
+
+                    type="password"
+                    placeholder="Senha"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+
+                />
+
+                <button
+                    onClick={login}
+                    disabled={loading}
+                >
+
+                    {loading ? "Entrando..." : "Entrar"}
+
+                </button>
+
+                <button
+
+                    className="register"
+
+                    onClick={() => setShowRegister(true)}
+
+                >
+
+                    Criar Conta
+
+                </button>
+
+            </div>
+
+        </div>
+
+    );
+
+}
+
+export default Login;
+
+
+==================================================
+ARQUIVO: src\components\auth\Register.jsx
+==================================================
+import { useState } from "react";
+import { supabase } from "../../services/supabase";
+//import Logo from "../../components/Logo";/
+//import BrandLogo from "../../components/BrandLogo";/
+
+import "../../styles/register.css";
+
+function Register({ onBack }) {
+
+    const [nome, setNome] = useState("");
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [loading, setLoading] = useState(false);
+
+
+    async function register() {
+
+        setLoading(true);
+
+        if (!nome.trim()) {
+
+            alert("Informe seu nome.");
+            return;
+
+        }
+
+        if (password !== confirmPassword) {
+
+            alert("As senhas não conferem.");
+            return;
+
+        }
+
+        const { data, error } = await supabase.auth.signUp({
+
+            email,
+            password,
+
+        });
+
+        if (error) {
+
+            alert(error.message);
+            return;
+
+        }
+
+        if (data.user) {
+
+            const { error: profileError } = await supabase
+
+            .from("profiles")
+        
+            .insert({
+        
+                id: data.user.id,
+        
+                nome,
+        
+            });
+        
+        if (profileError) {
+        
+            console.error(profileError);
+        
+        }
+
+        }
+
+        alert("Conta criada com sucesso.");
+
+        setLoading(false);
+
+        onBack();
+
+    }
+
+    return (
+
+        <div className="register-page">
+
+
+            <div className="register-card">
+
+                <h1>Criar Conta</h1>
+
+                <p>
+
+                    Crie sua conta no Atlas Finance.
+
+                </p>
+
+                <input
+
+                    placeholder="Nome"
+
+                    value={nome}
+
+                    onChange={(e)=>setNome(e.target.value)}
+
+                />
+
+                <input
+
+                    placeholder="Email"
+
+                    value={email}
+
+                    onChange={(e)=>setEmail(e.target.value)}
+
+                />
+
+                <input
+
+                    type="password"
+
+                    placeholder="Senha"
+
+                    value={password}
+
+                    onChange={(e)=>setPassword(e.target.value)}
+
+                />
+
+                <input
+
+                    type="password"
+
+                    placeholder="Confirmar senha"
+
+                    value={confirmPassword}
+
+                    onChange={(e)=>setConfirmPassword(e.target.value)}
+
+                />
+
+                <button
+                    onClick={register}
+                    disabled={loading}
+                >
+
+                    {loading ? "Criando..." : "Criar Conta"}
+
+                </button>
+
+                <button
+
+                    className="register-back"
+
+                    onClick={onBack}
+
+                >
+
+                    Voltar
+
+                </button>
+
+            </div>
+
+        </div>
+
+    );
+
+}
+
+export default Register;
+
+
+==================================================
+ARQUIVO: src\components\BrandLogo.jsx
+==================================================
+import atlasLogo from "../assets/branding/atlas-logo.svg";
+import personalLogo from "../assets/branding/personal-logo.svg";
+
+function BrandLogo({
+
+  type = "atlas",
+  size = 120,
+  className = "",
+
+}) {
+
+  const src = type === "atlas"
+
+    ? atlasLogo
+
+    : personalLogo;
+
+  return (
+
+    <img
+
+      src={src}
+
+      alt={type === "atlas" ? "Atlas Finance" : "Leandro Conde"}
+
+      width={size}
+      height={size}
+      className={className}
+      draggable={false}
+
+    />
+
+  );
+
+}
+
+export default BrandLogo;
+
+
+==================================================
+ARQUIVO: src\components\cards\metricCard.jsx
+==================================================
+import "../../styles/cards.css";
+import AnimatedNumber from "../common/AnimatedNumber";
+
+function MetricCard({
+
+    titulo,
+    valor,
+    insight,
+    delay,
+    children,
+
+}){
+
+    function getClass(){
+
+        switch(titulo){
+
+            case "Saldo Atual":
+                return "saldo";
+
+            case "Entradas":
+                return "entrada";
+
+            case "Saídas":
+                return "saida";
+
+            case "Investimentos":
+                return "investimento";
+
+            case "Renda Passiva":
+                return "passiva";
+
+            case "Economia":
+                return "economia";
+
+            case "Teto de Gastos":
+                return "gastos";
+
+            case "Valor guardado": return "guardado";
+
+            default:
+                return "";
+
+        }
+
+    }
+
+    return(
+
+        <div
+
+            className={`metric-card ${getClass()}`}
+
+            style={{
+
+                animationDelay:`${delay}ms`
+
+            }}
+
+        >
+
+            <h4>{titulo}</h4>
+
+            <h2>
+
+            <AnimatedNumber
+
+                value={valor}
+
+            />
+
+        </h2>
+
+            {insight !== null && insight !== undefined && (
+
+            <small
+                className={
+                    insight > 0
+                        ? "positive"
+                        : insight < 0
+                        ? "negative"
+                        : "neutral"
+                }
+            >
+
+                {insight > 0 ? "+" : ""}
+
+                {insight.toFixed(1)}%
+
+            </small>
+
+            )}
+
+            {children}
+
+        </div>
+
+    );
+
+}
+
+export default MetricCard;
+
+
+==================================================
+ARQUIVO: src\components\Charts.jsx
+==================================================
+<Charts
+    transactions={transactions}
+/>
+
+
+==================================================
+ARQUIVO: src\components\Charts\FinanceChart.jsx
+==================================================
+
+import { useEffect, useState } from "react";
+
+import {
+  AreaChart,
+  Area,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+
+import { formatCurrency } from "../../utils/formatCurrency";
+import { processChartData } from "../../utils/processChartData";
+import { processProjectedBalance } from "../../utils/processProjectedBalance";
+
+function formatLocalDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function getDiasAteVirarOMes() {
+  const hoje = new Date();
+
+  const inicioProximoMes = new Date(
+    hoje.getFullYear(),
+    hoje.getMonth() + 1,
+    1
+  );
+
+  const hojeSemHorario = new Date(
+    hoje.getFullYear(),
+    hoje.getMonth(),
+    hoje.getDate()
+  );
+
+  return Math.round(
+    (inicioProximoMes - hojeSemHorario) / (1000 * 60 * 60 * 24)
+  );
+}
+
+function getDateThreeMonthsAgo() {
+  const today = new Date();
+  const date = new Date(today);
+
+  date.setDate(1);
+  date.setMonth(date.getMonth() - 3);
+
+  const lastDay = new Date(
+    date.getFullYear(),
+    date.getMonth() + 1,
+    0
+  ).getDate();
+
+  date.setDate(Math.min(today.getDate(), lastDay));
+
+  return date;
+}
+
+
+function FinanceChart({
+  transactions = [],
+  allTransactions = [],
+  preservedChartHistory = [],
+  loans = [],
+  scheduledBills = [],
+  limiteGastos = 3000,
+  saldoBase = 0,
+}) {
+
+  const [mode, setMode] = useState("diario");
+  const [direction, setDirection] = useState("esquerda");
+  const [inverted, setInverted] = useState(false);
+  const [showOptions, setShowOptions] = useState(false);
+  const [showProjection, setShowProjection] = useState(false);
+  const [alertaTetoAtivo, setAlertaTetoAtivo] = useState(false);
+
+  const diasRestantes = getDiasAteVirarOMes();
+
+  const today = new Date();
+  const todayISO = formatLocalDate(today);
+  const mesAtual = todayISO.slice(0, 7);
+  const tresMesesAtrasISO = formatLocalDate(getDateThreeMonthsAgo());
+
+  const limiteNumerico = Number(limiteGastos) || 0;
+
+  // Soma as despesas reais do mês atual.
+  const gastosMesAtual = allTransactions
+    .filter((item) => {
+      if (item.tipo !== "saida" || !item.data) return false;
+
+      return String(item.data).slice(0, 7) === mesAtual;
+    })
+    .reduce((total, item) => {
+      return total + Number(item.valor || 0);
+    }, 0);
+
+  // Ativa o alerta quando os gastos ultrapassam o limite.
+  // Desativa quando o limite passa a cobrir os gastos.
+  useEffect(() => {
+    const chaveAlerta = `atlasFinanceTetoUltrapassado-${mesAtual}`;
+    const tetoUltrapassado =
+      limiteNumerico > 0 && gastosMesAtual > limiteNumerico;
+
+    try {
+      if (tetoUltrapassado) {
+        localStorage.setItem(chaveAlerta, "true");
+        setAlertaTetoAtivo(true);
+      } else {
+        localStorage.removeItem(chaveAlerta);
+        setAlertaTetoAtivo(false);
+      }
+    } catch (error) {
+      console.error("Não foi possível atualizar o alerta:", error);
+      setAlertaTetoAtivo(tetoUltrapassado);
+    }
+  }, [mesAtual, gastosMesAtual, limiteNumerico]);
+
+  const historicalData = processChartData(
+    transactions,
+    mode,
+    preservedChartHistory
+  );
+
+  const data = historicalData;
+
+  
+const projection = processProjectedBalance({
+  chartData: data,
+  allTransactions,
+  loans,
+  scheduledBills,
+  mode,
+  saldoBase,
+});
+
+
+  const orderedData =
+    direction === "esquerda"
+      ? projection.data
+      : [...projection.data].reverse();
+
+  const chartData = orderedData.map((item) => ({
+    ...item,
+    saida: inverted ? -item.saida : item.saida,
+    investimento: inverted ? -item.investimento : item.investimento,
+  }));
+
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: 500,
+        marginTop: 10,
+        background: "#18181b",
+        borderRadius: 20,
+        padding: 20,
+        boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
+        minHeight: 0,
+      }}
+    >
+      <style>
+        {`
+          @keyframes alertaTetoBrilho {
+            0%, 100% {
+              filter:
+                drop-shadow(0 0 3px #ff0000)
+                drop-shadow(0 0 7px #ff0000);
+              opacity: 1;
+            }
+
+            50% {
+              filter:
+                drop-shadow(0 0 7px #ff0000)
+                drop-shadow(0 0 16px #ff2222);
+              opacity: 0.75;
+            }
+          }
+
+          @keyframes alertaTetoPulso {
+            0%, 100% {
+              box-shadow: 0 0 8px #ef444455;
+            }
+
+            50% {
+              box-shadow: 0 0 22px #ef4444aa;
+            }
+          }
+        `}
+      </style>
+
+      {/* Cabeçalho e controles principais */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: showOptions ? 15 : 5,
+          gap: 10,
+          flexWrap: "wrap",
+          flexShrink: 0,
+        }}
+      >
+        <h2 style={{ margin: 0 }}>Evolução Financeira</h2>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            onClick={() => setShowProjection((current) => !current)}
+            title="Ativar ou desativar a previsão de saldo"
+            aria-pressed={showProjection}
+            style={{
+              background: showProjection ? "#27272a" : "#111113",
+              color: showProjection ? "#ffffff" : "#a1a1aa",
+              border: `1px solid ${
+                showProjection ? "#ffffff" : "#3f3f46"
+              }`,
+              borderRadius: 9,
+              padding: "7px 12px",
+              cursor: "pointer",
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+              transition: "0.2s ease",
+            }}
+          >
+            {showProjection
+              ? "● Previsão ligada"
+              : "○ Previsão desligada"}
+          </button>
+
+          <button
+            onClick={() => setShowOptions((current) => !current)}
+            style={{
+              background: "#111113",
+              color: "#ffffff",
+              border: "1px solid #2d2d2d",
+              borderRadius: 9,
+              padding: "7px 12px",
+              cursor: "pointer",
+              fontWeight: 600,
+              transition: "0.2s ease",
+            }}
+          >
+            {showOptions ? "▲ Opções" : "⚙ Opções"}
+          </button>
+        </div>
+      </div>
+
+      {/* Aviso de possíveis duplicatas */}
+      {showProjection && projection.possibleDuplicates.length > 0 && (
+        <div
+          role="status"
+          style={{
+            background: "#332713",
+            border: "1px solid #8a6427",
+            color: "#fde68a",
+            borderRadius: 8,
+            padding: "8px 10px",
+            margin: "10px 0",
+            fontSize: 12,
+            flexShrink: 0,
+          }}
+        >
+          ⚠️ Há {projection.possibleDuplicates.length} possível(is)
+          duplicata(s) entre empréstimos e contas agendadas com o mesmo
+          vencimento e valor. Confira os cadastros: nenhum item foi removido
+          automaticamente.
+        </div>
+      )}
+
+      {/* Opções do gráfico */}
+      {showOptions && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 6,
+            marginBottom: 15,
+            background: "#111113",
+            padding: 5,
+            borderRadius: 10,
+            flexWrap: "wrap",
+            flexShrink: 0,
+          }}
+        >
+          <button
+            onClick={() => setMode("diario")}
+            style={{
+              background: mode === "diario" ? "#7c3aed" : "transparent",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: 7,
+              padding: "7px 12px",
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            Diário
+          </button>
+
+          <button
+            onClick={() => setMode("mensal")}
+            style={{
+              background: mode === "mensal" ? "#7c3aed" : "transparent",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: 7,
+              padding: "7px 12px",
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            Mensal
+          </button>
+
+          <button
+            onClick={() =>
+              setDirection((current) =>
+                current === "esquerda" ? "direita" : "esquerda"
+              )
+            }
+            style={{
+              background: direction === "direita" ? "#7c3aed" : "transparent",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: 7,
+              padding: "7px 12px",
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            {direction === "esquerda" ? "← Esquerda" : "Direita →"}
+          </button>
+
+          <button
+            onClick={() => setInverted((current) => !current)}
+            style={{
+              background: inverted ? "#7c3aed" : "transparent",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: 7,
+              padding: "7px 12px",
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            {inverted ? "Invertido" : "Normal"}
+          </button>
+        </div>
+      )}
+
+      {/* Área do gráfico */}
+      <div
+        style={{
+          flex: "1 1 0",
+          minHeight: 0,
+          width: "100%",
+        }}
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart
+            data={chartData}
+            margin={{ top: 5, right: 10, left: -5, bottom: 0 }}
+          >
+            <CartesianGrid stroke="#2d2d2d" vertical={false} />
+
+            <XAxis
+              dataKey="data"
+              axisLine={false}
+              tickLine={false}
+            />
+
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={(value) => formatCurrency(Math.abs(value))}
+            />
+
+            <YAxis
+              yAxisId="saldo"
+              hide
+              domain={["auto", "auto"]}
+            />
+
+            <Tooltip
+              contentStyle={{
+                background: "#18181B",
+                border: "1px solid #333",
+                borderRadius: 12,
+                color: "#ffffff",
+              }}
+              formatter={(value, name) => [
+                formatCurrency(
+                  name === "Saldo projetado" ? value : Math.abs(value)
+                ),
+                name,
+              ]}
+              labelStyle={{ color: "#ffffff" }}
+            />
+
+            <Legend iconType="circle" />
+
+            <Area
+              type="monotone"
+              dataKey="entrada"
+              name="Entradas"
+              stroke="#22c55e"
+              fill="#22c55e33"
+              strokeWidth={3}
+              animationDuration={900}
+            />
+
+            <Area
+              type="monotone"
+              dataKey="saida"
+              name="Saídas"
+              stroke={alertaTetoAtivo ? "#ff0000" : "#ef4444"}
+              fill={alertaTetoAtivo ? "#ff000033" : "#ef444433"}
+              strokeWidth={alertaTetoAtivo ? 5 : 3}
+              style={
+                alertaTetoAtivo
+                  ? { animation: "alertaTetoBrilho 1.2s ease-in-out infinite" }
+                  : undefined
+              }
+              animationDuration={900}
+            />
+
+            <Area
+              type="monotone"
+              dataKey="investimento"
+              name="Investimentos"
+              stroke="#facc15"
+              fill="#facc1533"
+              strokeWidth={3}
+              animationDuration={900}
+            />
+
+            
+            {/* ALTERAÇÃO: série para valores retirados da reserva */}
+            <Area
+              type="monotone"
+              dataKey="valorGuardadoUtilizado"
+              name="Valor guardado utilizado"
+              stroke="#22D3EE"
+              fill="#22D3EE33"
+              strokeWidth={3}
+              animationDuration={900}
+            />
+
+
+            {showProjection && (
+              <Line
+                yAxisId="saldo"
+                type="monotone"
+                dataKey="saldoProjetado"
+                name="Saldo projetado"
+                stroke="#ffffff"
+                strokeWidth={3}
+                dot={false}
+                activeDot={{
+                  r: 5,
+                  fill: "#ffffff",
+                  stroke: "#18181b",
+                }}
+                connectNulls={false}
+                isAnimationActive={false}
+              />
+            )}
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Alerta de teto abaixo do gráfico */}
+      {alertaTetoAtivo && (
+        <div
+          role="alert"
+          style={{
+            background: "#450a0a",
+            border: "1px solid #ef4444",
+            color: "#fecaca",
+            borderRadius: 10,
+            padding: "10px 14px",
+            marginTop: 12,
+            fontSize: 13,
+            fontWeight: 700,
+            animation: "alertaTetoPulso 1.5s ease-in-out infinite",
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ fontSize: 15, marginBottom: 5 }}>
+            🚨 TETO DE GASTOS ULTRAPASSADO!
+          </div>
+
+          <div>
+            Gastos do mês: {formatCurrency(gastosMesAtual)}
+            {" · "}
+            Limite: {formatCurrency(limiteNumerico)}
+          </div>
+
+          <div style={{ marginTop: 5, fontWeight: 500 }}>
+            {diasRestantes === 0
+              ? "O mês termina hoje. O alerta será atualizado na virada do mês."
+              : `Faltam ${diasRestantes} ${
+                  diasRestantes === 1 ? "dia" : "dias"
+                } para virar o mês.`}{" "}
+            O alerta será encerrado automaticamente na virada do mês,
+            ou antes, se você aumentar o limite para cobrir seus gastos.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default FinanceChart;
+
+
+
+==================================================
+ARQUIVO: src\components\common\AnimatedNumber.jsx
+==================================================
+import { useEffect, useState } from "react";
+
+function AnimatedNumber({
+
+    value,
+    duration = 900,
+
+}){
+
+    const [displayValue, setDisplayValue] = useState(0);
+
+    useEffect(()=>{
+
+        let start = 0;
+
+        const increment = value / (duration / 16);
+
+        const timer = setInterval(()=>{
+
+            start += increment;
+
+            if(start >= value){
+
+                start = value;
+
+                clearInterval(timer);
+
+            }
+
+            setDisplayValue(start);
+
+        },16);
+
+        return ()=>clearInterval(timer);
+
+    },[value,duration]);
+
+    return (
+
+        displayValue.toLocaleString(
+
+            "pt-BR",
+
+            {
+
+                style:"currency",
+
+                currency:"BRL",
+
+            }
+
+        )
+
+    );
+
+}
+
+export default AnimatedNumber;
+
+
+==================================================
+ARQUIVO: src\components\common\Logo.jsx
+==================================================
+import "../../styles/logo.css";
+
+function Logo({
+
+    variant = "atlas",
+    size = 90,
+
+}){
+
+    let src = "/src/assets/logos/placeholder.svg";
+
+    if(variant==="atlas"){
+
+        src="/src/assets/logos/atlas-logo.svg";
+
+    }
+
+    if(variant==="personal"){
+
+        src="/src/assets/logos/personal-logo.svg";
+
+    }
+
+    return(
+
+        <img
+
+            src={src}
+
+            className="logo"
+
+            style={{
+
+                width:size,
+
+                height:"auto",
+
+            }}
+
+            alt="Logo"
+
+        />
+
+    );
+
+}
+
+export default Logo;
+
+
+==================================================
+ARQUIVO: src\components\Dashboard.jsx
+==================================================
+import { useEffect, useState } from "react";
+import { calculateDashboardMetrics } from "../utils/dashboardMetrics";
+import MetricCard from "./cards/metricCard";
+import { getDashboardInsights } from "../utils/dashboardInsights";
+
+function Dashboard({
+    transactions = [],
+    allTransactions = [],
+    goal,
+    limiteGastos = 3000,
+    onSalvarLimiteGastos,
+    onUsarValorGuardado,
+    onEditarMeta,
+    saldoBase = 0,
+    investimentosBase = 0,
+    valorGuardadoUtilizadoBase = 0,
+    financialDataLoaded = false,
+
+}) {
+    const [modalAberto, setModalAberto] = useState(false);
+    const [novoLimite, setNovoLimite] = useState(String(limiteGastos));
+    const [erro, setErro] = useState("");
+
+    const [modalValorGuardado, setModalValorGuardado] = useState(false);
+    const [valorParaUsar, setValorParaUsar] = useState("");
+    const [erroValorGuardado, setErroValorGuardado] = useState("");
+    const [salvandoValorGuardado, setSalvandoValorGuardado] = useState(false);
+
+    useEffect(() => {
+        setNovoLimite(String(limiteGastos));
+    }, [limiteGastos]);
+
+    const {
+        saldo,
+        entradas,
+        saidas,
+        investimentos,
+        economia,
+        tetoGastos,
+        percentualGasto,
+    } = calculateDashboardMetrics(
+        transactions,
+        limiteGastos,
+        saldoBase,
+        investimentosBase
+    );
+
+    const insights = getDashboardInsights(transactions);
+
+    
+    /* ALTERAÇÃO: soma todo o dinheiro já utilizado */
+    
+const totalJaUtilizado =
+Number(valorGuardadoUtilizadoBase || 0) +
+allTransactions
+    .filter(
+        (item) =>
+            item.tipo === "saida" &&
+            item.descricao === "Valor guardado usado"
+    )
+    .reduce(
+        (total, item) => total + Number(item.valor || 0),
+        0
+    );
+
+
+    /* ALTERAÇÃO: calcula os investimentos usando o histórico completo */
+    const totalInvestimentosGuardados =
+        Number(investimentosBase || 0) +
+        allTransactions
+            .filter((item) => item.tipo === "investimento")
+            .reduce(
+                (total, item) => total + Number(item.valor || 0),
+                0
+            );
+
+    /* ALTERAÇÃO: o dinheiro guardado inclui os investimentos
+       e desconta os valores que já foram utilizados */
+    const valorGuardado = Math.max(
+        0,
+        Number(goal?.valor_inicial || 0) +
+            totalInvestimentosGuardados -
+            totalJaUtilizado
+    );
+
+    /* ALTERAÇÃO: o progresso da meta usa o mesmo cálculo */
+    const valorAtualMeta = valorGuardado;
+
+    const percentualMeta =
+        goal && Number(goal.valor_meta) > 0
+            ? Math.min(
+                (valorAtualMeta / Number(goal.valor_meta)) * 100,
+                100
+            )
+            : 0;
+
+
+    const formatarMoeda = (valor) =>
+        Number(valor).toLocaleString("pt-BR", {
+            style: "currency",
+            currency: "BRL",
+        });
+
+    async function salvarLimite(event) {
+        event.preventDefault();
+
+        const valor = Number(novoLimite.replace(",", "."));
+
+        if (!Number.isFinite(valor) || valor <= 0) {
+            setErro("Informe um limite maior que zero.");
+            return;
+        }
+
+        if (typeof onSalvarLimiteGastos !== "function") {
+            setErro("A função de salvamento ainda não foi conectada.");
+            return;
+        }
+
+        try {
+            setErro("");
+            await onSalvarLimiteGastos(valor);
+            setModalAberto(false);
+        } catch (error) {
+            console.error("Erro ao salvar limite de gastos:", error);
+            setErro("Não foi possível salvar. Tente novamente.");
+        }
+    }
+
+    async function usarValorGuardado(event) {
+        event.preventDefault();
+
+        const valor = Number(valorParaUsar.replace(",", "."));
+
+        if (!Number.isFinite(valor) || valor <= 0) {
+            setErroValorGuardado("Informe um valor válido maior que zero.");
+            return;
+        }
+
+        if (valor > valorGuardado + 0.001) {
+            setErroValorGuardado(
+                "O valor informado ultrapassa o dinheiro guardado disponível."
+            );
+            return;
+        }
+
+        if (typeof onUsarValorGuardado !== "function") {
+            setErroValorGuardado(
+                "A função de utilização ainda não foi conectada."
+            );
+            return;
+        }
+
+        try {
+            setErroValorGuardado("");
+            setSalvandoValorGuardado(true);
+
+            await onUsarValorGuardado(valor);
+
+            setValorParaUsar("");
+            setModalValorGuardado(false);
+        } catch (error) {
+            console.error("Erro ao usar valor guardado:", error);
+            setErroValorGuardado(
+                error.message || "Não foi possível registrar a utilização."
+            );
+        } finally {
+            setSalvandoValorGuardado(false);
+        }
+    }
+
+    if (!financialDataLoaded) {
+        return (
+            <section className="dashboard">
+                <div className="saldo-card">
+                    <h2>Saldo Atual</h2>
+                    <p>Carregando dados financeiros...</p>
+                </div>
+            </section>
+        );
+    }
+
+    return (
+        <section className="dashboard">
+            <div className="saldo-card">
+                <h2>Saldo Atual</h2>
+                <h1>{formatarMoeda(saldo)}</h1>
+            </div>
+
+            <div className="metrics-grid">
+                <MetricCard titulo="Saldo Atual" valor={saldo} delay={0} />
+
+                <MetricCard
+                    titulo="Entradas"
+                    valor={entradas}
+                    insight={insights.entrada}
+                    delay={120}
+                />
+
+                <MetricCard
+                    titulo="Saídas"
+                    valor={saidas}
+                    insight={insights.saida}
+                    delay={240}
+                />
+
+                <MetricCard
+                    titulo="Investimentos"
+                    valor={investimentos}
+                    insight={insights.investimento}
+                    delay={360}
+                />
+
+                <MetricCard
+                    titulo="Economia"
+                    valor={economia}
+                    delay={600}
+                />
+
+                <MetricCard
+                    titulo="Valor guardado"
+                    valor={valorGuardado}
+                    delay={660}
+                >
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setValorParaUsar("");
+                            setErroValorGuardado("");
+                            setModalValorGuardado(true);
+                        }}
+                        style={{
+                            display: "block",
+                            marginTop: 8,
+                            padding: "6px 10px",
+                            background: "#27272a",
+                            color: "#fff",
+                            border: "1px solid #52525b",
+                            borderRadius: 8,
+                            cursor: "pointer",
+                        }}
+                    >
+                        Usar valor guardado
+                    </button>
+                </MetricCard>
+
+                <MetricCard
+                    titulo="Teto de Gastos"
+                    valor={tetoGastos}
+                    delay={720}
+                >
+                    <small>
+                        {percentualGasto.toFixed(0)}% utilizado
+                    </small>
+
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setNovoLimite(String(limiteGastos));
+                            setErro("");
+                            setModalAberto(true);
+                        }}
+                        style={{
+                            display: "block",
+                            marginTop: 8,
+                            padding: "6px 10px",
+                            background: "#27272a",
+                            color: "#fff",
+                            border: "1px solid #52525b",
+                            borderRadius: 8,
+                            cursor: "pointer",
+                        }}
+                    >
+                        Alterar limite
+                    </button>
+                </MetricCard>
+            </div>
+
+            {modalValorGuardado && (
+                <div
+                    role="presentation"
+                    onClick={(event) => {
+                        if (
+                            event.target === event.currentTarget &&
+                            !salvandoValorGuardado
+                        ) {
+                            setModalValorGuardado(false);
+                        }
+                    }}
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        zIndex: 1001,
+                        background: "rgba(0, 0, 0, 0.75)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: 20,
+                    }}
+                >
+                    <form
+                        onSubmit={usarValorGuardado}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="titulo-valor-guardado"
+                        style={{
+                            width: "100%",
+                            maxWidth: 400,
+                            padding: 24,
+                            background: "#18181b",
+                            color: "#fff",
+                            border: "1px solid #3f3f46",
+                            borderRadius: 16,
+                            boxSizing: "border-box",
+                        }}
+                    >
+                        <h2 id="titulo-valor-guardado">
+                            Usar valor guardado
+                        </h2>
+
+                        <p>
+                            Disponível:{" "}
+                            <strong>{formatarMoeda(valorGuardado)}</strong>
+                        </p>
+
+                        {valorGuardado <= 0 && (
+                            <p role="status">
+                                Não há dinheiro guardado disponível para utilizar.
+                            </p>
+                        )}
+
+                        <label
+                            htmlFor="valor-para-usar"
+                            style={{ display: "block", marginBottom: 8 }}
+                        >
+                            Quanto deseja utilizar? (R$)
+                        </label>
+
+                        <input
+                            id="valor-para-usar"
+                            type="number"
+                            min="0.01"
+                            max={valorGuardado}
+                            step="0.01"
+                            required
+                            value={valorParaUsar}
+                            
+                            /* ALTERAÇÃO: atualiza o valor e limpa o erro antigo ao digitar */
+                            onChange={(event) => {
+                                setValorParaUsar(event.target.value);
+                                setErroValorGuardado("");
+                            }}
+
+                            disabled={
+                                salvandoValorGuardado || valorGuardado <= 0
+                            }
+                            style={{
+                                width: "100%",
+                                padding: 12,
+                                background: "#09090b",
+                                color: "#fff",
+                                border: "1px solid #52525b",
+                                borderRadius: 8,
+                                boxSizing: "border-box",
+                            }}
+                        />
+
+                        {erroValorGuardado && (
+                            <p role="alert" style={{ color: "#f87171" }}>
+                                {erroValorGuardado}
+                            </p>
+                        )}
+
+                        <div
+                            style={{
+                                display: "flex",
+                                justifyContent: "flex-end",
+                                gap: 8,
+                                marginTop: 20,
+                            }}
+                        >
+                            <button
+                                type="button"
+                                disabled={salvandoValorGuardado}
+                                onClick={() => setModalValorGuardado(false)}
+                                style={{
+                                    padding: "9px 12px",
+                                    background: "#27272a",
+                                    color: "#fff",
+                                    border: "none",
+                                    borderRadius: 8,
+                                    cursor: "pointer",
+                                }}
+                            >
+                                Cancelar
+                            </button>
+
+                            <button
+                                type="submit"
+                                disabled={
+                                    salvandoValorGuardado || valorGuardado <= 0
+                                }
+                                style={{
+                                    padding: "9px 12px",
+                                    background: "#7c3aed",
+                                    color: "#fff",
+                                    border: "none",
+                                    borderRadius: 8,
+                                    cursor:
+                                        salvandoValorGuardado ||
+                                        valorGuardado <= 0
+                                            ? "not-allowed"
+                                            : "pointer",
+                                    opacity:
+                                        salvandoValorGuardado ||
+                                        valorGuardado <= 0
+                                            ? 0.6
+                                            : 1,
+                                }}
+                            >
+                                {salvandoValorGuardado
+                                    ? "Registrando..."
+                                    : "Confirmar utilização"}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {goal && (
+                <div className="goal-dashboard-card">
+                    <div className="goal-dashboard-header">
+                        <h3>🎯 {goal.nome}</h3>
+                        <strong>{percentualMeta.toFixed(0)}%</strong>
+                    </div>
+
+                    <p>
+                        {formatarMoeda(valorAtualMeta)}
+                        {" de "}
+                        {formatarMoeda(goal.valor_meta)}
+                    </p>
+
+                    <div className="goal-bar">
+                        <div
+                            className="goal-progress"
+                            style={{ width: `${percentualMeta}%` }}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {modalAberto && (
+                <div
+                    role="presentation"
+                    onClick={(event) => {
+                        if (event.target === event.currentTarget) {
+                            setModalAberto(false);
+                        }
+                    }}
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        zIndex: 1000,
+                        background: "rgba(0, 0, 0, 0.75)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: 20,
+                    }}
+                >
+                    <form
+                        onSubmit={salvarLimite}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="titulo-limite"
+                        style={{
+                            width: "100%",
+                            maxWidth: 400,
+                            padding: 24,
+                            background: "#18181b",
+                            color: "#fff",
+                            border: "1px solid #3f3f46",
+                            borderRadius: 16,
+                            boxSizing: "border-box",
+                        }}
+                    >
+                        <h2 id="titulo-limite">
+                            Alterar limite de gastos
+                        </h2>
+
+                        <p>
+                            Defina quanto você pretende gastar no período
+                            considerado pelo dashboard.
+                        </p>
+
+                        <label
+                            htmlFor="novo-limite"
+                            style={{ display: "block", marginBottom: 8 }}
+                        >
+                            Limite mensal (R$)
+                        </label>
+
+                        <input
+                            id="novo-limite"
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            required
+                            value={novoLimite}
+                            onChange={(event) =>
+                                setNovoLimite(event.target.value)
+                            }
+                            style={{
+                                width: "100%",
+                                padding: 12,
+                                background: "#09090b",
+                                color: "#fff",
+                                border: "1px solid #52525b",
+                                borderRadius: 8,
+                                boxSizing: "border-box",
+                            }}
+                        />
+
+                        {erro && (
+                            <p role="alert" style={{ color: "#f87171" }}>
+                                {erro}
+                            </p>
+                        )}
+
+                        <div
+                            style={{
+                                display: "flex",
+                                justifyContent: "flex-end",
+                                gap: 8,
+                                marginTop: 20,
+                            }}
+                        >
+                            <button
+                                type="button"
+                                onClick={() => setModalAberto(false)}
+                                style={{
+                                    padding: "9px 12px",
+                                    background: "#27272a",
+                                    color: "#fff",
+                                    border: "none",
+                                    borderRadius: 8,
+                                    cursor: "pointer",
+                                }}
+                            >
+                                Cancelar
+                            </button>
+
+                            <button
+                                type="submit"
+                                style={{
+                                    padding: "9px 12px",
+                                    background: "#7c3aed",
+                                    color: "#fff",
+                                    border: "none",
+                                    borderRadius: 8,
+                                    cursor: "pointer",
+                                }}
+                            >
+                                Salvar limite
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+        </section>
+    );
+}
+
+export default Dashboard;
+
+
+==================================================
+ARQUIVO: src\components\dashboard\ProgressBar.jsx
+==================================================
+function ProgressBar({ percentage }) {
+    const progress = Math.min(percentage, 100);
+  
+    return (
+      <div className="progress-container">
+        <div
+          className="progress-fill"
+          style={{
+            width: `${progress}%`,
+          }}
+        ></div>
+      </div>
+    );
+  }
+  
+  export default ProgressBar;
+
+
+==================================================
+ARQUIVO: src\components\FilterBar.jsx
+==================================================
+import "../styles/filterbar.css";
+
+
+function FilterBar({ filtro, setFiltro }) {
+
+    const filtros = [
+        "Todos",
+        "Entradas",
+        "Saídas",
+        "Investimentos",
+        "Renda Passiva",
+    ];
+
+    return (
+
+        <div className="filter-bar">
+
+            {filtros.map((item) => (
+
+                <button
+
+                    key={item}
+
+                    className={
+                        filtro === item
+                            ? "active"
+                            : ""
+                    }
+
+                    onClick={() => setFiltro(item)}
+
+                >
+
+                    {item}
+
+                </button>
+
+            ))}
+
+        </div>
+
+    );
+
+}
+
+export default FilterBar;
+
+
+==================================================
+ARQUIVO: src\components\GoalModal.jsx
+==================================================
+
+import { useState, useEffect } from "react";
+
+function GoalModal({ goal, onSave, onClose }) {
+    const [form, setForm] = useState({
+        nome: "Investimentos/Guardados",
+        valor_meta: "",
+        valor_inicial: "",
+        prazo_meses: "",
+    });
+
+    useEffect(() => {
+        if (!goal) {
+            setForm({
+                nome: "Investimentos/Guardados",
+                valor_meta: "",
+                valor_inicial: "",
+                prazo_meses: "",
+            });
+            return;
+        }
+
+        setForm({
+            nome: goal.nome || "Investimentos/Guardados",
+            valor_meta: goal.valor_meta || "",
+            valor_inicial: goal.valor_inicial || "",
+            prazo_meses: goal.prazo_meses || "",
+        });
+    }, [goal]);
+
+    function handleChange(e) {
+        const { name, value } = e.target;
+
+        setForm((prevForm) => ({
+            ...prevForm,
+            [name]: value,
+        }));
+    }
+
+    function salvar() {
+        if (!form.nome.trim()) {
+            alert("Informe o nome da meta.");
+            return;
+        }
+
+        if (!form.valor_meta || Number(form.valor_meta) <= 0) {
+            alert("Informe um valor-alvo maior que zero.");
+            return;
+        }
+
+        if (!form.prazo_meses || Number(form.prazo_meses) <= 0) {
+            alert("Informe um prazo válido em meses.");
+            return;
+        }
+
+        onSave({
+            ...goal,
+            ...form,
+            nome: "Investimentos/Guardados",
+            valor_meta: Number(form.valor_meta),
+            valor_inicial: Number(form.valor_inicial || 0),
+            prazo_meses: Number(form.prazo_meses),
+        });
+    }
+
+    return (
+        <div>
+            <h2>Investimentos/Guardados</h2>
+
+            <p>
+                Defina quanto deseja acumular e em quanto tempo pretende
+                alcançar esse objetivo.
+            </p>
+
+            <label htmlFor="nome-meta">
+                Nome da meta
+            </label>
+            <input
+                id="nome-meta"
+                name="nome"
+                placeholder="Investimentos/Guardados"
+                value={form.nome}
+                onChange={handleChange}
+                readOnly
+            />
+
+            <label htmlFor="valor-meta">
+                Valor-alvo (R$)
+            </label>
+            <input
+                id="valor-meta"
+                name="valor_meta"
+                type="number"
+                min="0.01"
+                step="0.01"
+                placeholder="Ex.: 5000"
+                value={form.valor_meta}
+                onChange={handleChange}
+                required
+            />
+
+            <label htmlFor="valor-inicial">
+                Valor inicial já acumulado (R$)
+            </label>
+            <input
+                id="valor-inicial"
+                name="valor_inicial"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Ex.: 0"
+                value={form.valor_inicial}
+                onChange={handleChange}
+            />
+
+            <label htmlFor="prazo-meses">
+                Prazo (meses)
+            </label>
+            <input
+                id="prazo-meses"
+                name="prazo_meses"
+                type="number"
+                min="1"
+                step="1"
+                placeholder="Ex.: 12"
+                value={form.prazo_meses}
+                onChange={handleChange}
+                required
+            />
+
+            <div className="wizard-buttons">
+                <button type="button" onClick={onClose}>
+                    Cancelar
+                </button>
+
+                <button type="button" onClick={salvar}>
+                    Salvar
+                </button>
+            </div>
+        </div>
+    );
+}
+
+export default GoalModal;
+
+
+
+==================================================
+ARQUIVO: src\components\Header.jsx
+==================================================
+
+import { useEffect, useState } from "react";
+import { supabase } from "../services/supabase";
+import "../styles/header.css";
+
+const AVATAR_BUCKET = "avatars";
+const SIGNED_URL_SECONDS = 60 * 60;
+
+function Header({ onOpenProfile, onGoHome, currentPage = "home" }) {
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [userId, setUserId] = useState("");
+  const [accessibilityOpen, setAccessibilityOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAvatar() {
+      const { data, error } = await supabase.auth.getUser();
+
+      if (error || !data.user) {
+        if (!cancelled) {
+          setAvatarUrl("");
+          setUserId("");
+        }
+        return;
+      }
+
+      const user = data.user;
+      const avatarPath = user.user_metadata?.avatar_path;
+
+      if (cancelled) return;
+
+      setUserId(user.id);
+
+      if (!avatarPath) {
+        setAvatarUrl("");
+        return;
+      }
+
+      const { data: signedData, error: signedError } =
+        await supabase.storage
+          .from(AVATAR_BUCKET)
+          .createSignedUrl(avatarPath, SIGNED_URL_SECONDS);
+
+      if (cancelled) return;
+
+      if (signedError) {
+        console.error("Erro ao carregar foto do perfil:", signedError);
+        setAvatarUrl("");
+        return;
+      }
+
+      setAvatarUrl(signedData?.signedUrl || "");
+    }
+
+    loadAvatar();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session?.user) {
+        setAvatarUrl("");
+        setUserId("");
+      } else if (
+        event === "SIGNED_IN" ||
+        event === "USER_UPDATED"
+      ) {
+        loadAvatar();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  async function logout() {
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      console.error("Erro ao sair:", error);
+    }
+  }
+
+  return (
+    <header className="header">
+      <button
+        className="header-brand"
+        type="button"
+        onClick={onGoHome}
+        aria-label="Voltar ao Atlas Finance"
+      >
+        <img
+          src={`${import.meta.env.BASE_URL}atlas-logo.png`}
+          alt="Logo Atlas Finance"
+          className="header-logo"
+        />
+        <h2>Atlas Finance</h2>
+      </button>
+
+      <div className="header-actions">
+        <div className="accessibility-container">
+          <button
+            className="accessibility-button"
+            type="button"
+            onClick={() => setAccessibilityOpen((open) => !open)}
+            aria-label="Acessibilidade"
+            aria-expanded={accessibilityOpen}
+            aria-controls="accessibility-panel"
+            title="Acessibilidade"
+          >
+            <span aria-hidden="true">♿</span>
+          </button>
+
+          {accessibilityOpen && (
+            <section
+              id="accessibility-panel"
+              className="accessibility-panel"
+              aria-label="Painel de acessibilidade"
+            >
+              <div className="accessibility-panel-header">
+                <h3>Acessibilidade</h3>
+
+                <button
+                  type="button"
+                  className="accessibility-close"
+                  onClick={() => setAccessibilityOpen(false)}
+                  aria-label="Fechar painel de acessibilidade"
+                >
+                  ×
+                </button>
+              </div>
+
+              <p>
+                Personalize sua experiência no Atlas Finance.
+              </p>
+
+              <div className="accessibility-option">
+                <span>Leitura facilitada</span>
+                <small>
+                  Ajustes de tamanho do texto
+                </small>
+              </div>
+
+              <div className="accessibility-option">
+                <span>Contraste e visibilidade</span>
+                <small>
+                  Melhorias para leitura dos elementos
+                </small>
+              </div>
+
+              <div className="accessibility-option">
+                <span>Navegação por teclado</span>
+                <small>
+                  Acesso aos controles sem usar o mouse
+                </small>
+              </div>
+
+              <p className="accessibility-coming-soon">
+                Os ajustes serão habilitados nas próximas etapas.
+              </p>
+            </section>
+          )}
+        </div>
+
+        <button
+          className="profile-icon-button"
+          type="button"
+          onClick={currentPage === "profile" ? onGoHome : onOpenProfile}
+          title={currentPage === "profile" ? "Voltar ao painel" : "Meu perfil"}
+          aria-label={currentPage === "profile" ? "Voltar ao painel" : "Meu perfil"}
+        >
+          {currentPage === "profile" ? (
+            "⌂"
+          ) : avatarUrl ? (
+            <img
+              key={`${userId}-${avatarUrl}`}
+              src={avatarUrl}
+              alt="Minha foto de perfil"
+              className="header-avatar"
+            />
+          ) : (
+            "👤"
+          )}
+        </button>
+
+        <button className="logout-button" onClick={logout} type="button">
+          Sair
+        </button>
+      </div>
+    </header>
+  );
+}
+
+export default Header;
+
+
+
+==================================================
+ARQUIVO: src\components\Home.jsx
+==================================================
+
+import Dashboard from "./Dashboard";
+import FinanceChart from "./Charts/FinanceChart";
+
+import "../styles/home.css";
+
+function Home({
+  transactions,
+  allTransactions,
+  preservedChartHistory = [],
+  loans,
+  scheduledBills,
+  goal,
+  limiteGastos,
+  onSalvarLimiteGastos,
+  onUsarValorGuardado,
+  onEditarMeta,
+  saldoBase = 0,
+  investimentosBase = 0,
+  valorGuardadoUtilizadoBase = 0,
+  financialDataLoaded = false,
+}) {
+
+  return (
+    <section className="home">
+      <div className="left-panel">
+        
+      <Dashboard
+  transactions={transactions}
+  allTransactions={allTransactions}
+  goal={goal}
+  limiteGastos={limiteGastos}
+  onSalvarLimiteGastos={onSalvarLimiteGastos}
+  onUsarValorGuardado={onUsarValorGuardado}
+  saldoBase={saldoBase}
+  investimentosBase={investimentosBase}
+  valorGuardadoUtilizadoBase={valorGuardadoUtilizadoBase}
+  financialDataLoaded={financialDataLoaded}
+
+  onEditarMeta={onEditarMeta}
+/>
+
+      </div>
+
+      <div className="right-panel">
+        
+      <FinanceChart
+  transactions={transactions}
+  allTransactions={allTransactions}
+  preservedChartHistory={preservedChartHistory}
+  loans={loans}
+  scheduledBills={scheduledBills}
+  limiteGastos={limiteGastos}
+  saldoBase={saldoBase}
+/>
+
+      </div>
+    </section>
+  );
+}
+
+export default Home;
+
+
+
+==================================================
+ARQUIVO: src\components\LoanCard.jsx
+==================================================
+import "../styles/loan.css";
+
+function LoanCard({
+    loan,
+    onDelete,
+    onPay,
+    onEdit,
+}) {
+
+    return (
+        <div className={`loan-card ${loan.tipo}`}>
+
+            <div>
+                <strong>
+                    {loan.pessoa}
+                </strong>
+            </div>
+
+            <small>
+                {loan.descricao}
+            </small>
+
+            <p>
+                📅 {loan.vencimento}
+            </p>
+
+            <p>
+                Prioridade:
+                <strong>
+                    {" "}
+                    {loan.prioridade}
+                </strong>
+            </p>
+
+            <h3>
+                {Number(loan.valor).toLocaleString(
+                    "pt-BR",
+                    {
+                        style: "currency",
+                        currency: "BRL",
+                    }
+                )}
+            </h3>
+
+            <div className="loan-footer">
+
+                <span>
+                    {loan.tipo === "receber"
+                        ? "💰 Receber"
+                        : "💸 Pagar"}
+                </span>
+
+                <span
+                    className={`loan-status ${loan.status}`}
+                >
+                    {loan.status === "pendente"
+                        ? "🟡 Pendente"
+                        : "🟢 Quitado"}
+                </span>
+
+            </div>
+
+            <div className="loan-actions">
+
+                <button
+                    onClick={() => onEdit(loan)}
+                >
+                    ✏ Editar
+                </button>
+
+                <button
+                    disabled={loan.status === "pago"}
+                    onClick={() => onPay(loan.id)}
+                >
+                    ✔ Quitar
+                </button>
+
+                <button
+                    onClick={() => onDelete(loan.id)}
+                >
+                    🗑 Excluir
+                </button>
+
+            </div>
+
+        </div>
+    );
+}
+
+export default LoanCard;
+
+
+==================================================
+ARQUIVO: src\components\LoanList.jsx
+==================================================
+import LoanCard from "./LoanCard";
+
+function LoanList({
+
+    loans,
+
+    onDelete,
+
+    onPay,
+
+    onEdit,
+
+}){
+
+    return(
+
+        <div className="loan-list">
+
+            {
+
+                loans.map((loan)=>(
+
+                    <LoanCard
+
+                        key={loan.id}
+
+                        loan={loan}
+
+                        onDelete={onDelete}
+
+                        onPay={onPay}
+
+                        onEdit={onEdit}
+
+                    />
+
+                ))
+
+            }
+
+        </div>
+
+    );
+
+}
+
+export default LoanList;
+
+
+==================================================
+ARQUIVO: src\components\LoanModal.jsx
+==================================================
+import { useState, useEffect } from "react";
+
+function LoanModal({
+
+    loan,
+
+    onSave,
+
+    onClose,
+
+}) {
+
+    const [form, setForm] = useState({
+
+        status: loan?.status || "pendente",
+    
+        tipo: loan?.tipo || "pagar",
+    
+        pessoa: loan?.pessoa || "",
+    
+        descricao: loan?.descricao || "",
+    
+        observacao: loan?.observacao || "",
+    
+        valor: loan?.valor || "",
+    
+        vencimento: loan?.vencimento || "",
+    
+        prioridade: loan?.prioridade || "media",
+    
+    });
+
+    useEffect(() => {
+
+        if (!loan) return;
+    
+        setForm({
+    
+            status: loan.status,
+    
+            tipo: loan.tipo,
+    
+            pessoa: loan.pessoa,
+    
+            descricao: loan.descricao,
+    
+            observacao: loan.observacao,
+    
+            valor: loan.valor,
+    
+            vencimento: loan.vencimento,
+    
+            prioridade: loan.prioridade,
+    
+        });
+    
+    }, [loan]);
+
+    function handleChange(e) {
+
+        setForm({
+
+            ...form,
+
+            [e.target.name]: e.target.value,
+
+        });
+
+    }
+
+    function salvar() {
+
+        if (!form.pessoa.trim()) {
+
+            alert("Informe a pessoa.");
+
+            return;
+
+        }
+
+        if (!form.descricao.trim()) {
+
+            alert("Informe uma descrição.");
+
+            return;
+
+        }
+
+        if (!form.valor) {
+
+            alert("Informe um valor.");
+
+            return;
+
+        }
+
+        if (!form.vencimento) {
+
+            alert("Informe uma data.");
+
+            return;
+
+        }
+
+        onSave({
+
+            ...loan,
+        
+            ...form,
+        
+        });
+
+    }
+
+    return (
+
+        <div>
+
+            <h2>Novo Empréstimo</h2>
+
+            <select
+                name="tipo"
+                value={form.tipo}
+                onChange={handleChange}
+            >
+
+                <option value="pagar">
+
+                    Vou pagar
+
+                </option>
+
+                <option value="receber">
+
+                    Vou receber
+
+                </option>
+
+            </select>
+
+            <input
+                name="pessoa"
+                placeholder="Pessoa"
+                value={form.pessoa}
+                onChange={handleChange}
+            />
+
+            <input
+                name="descricao"
+                placeholder="Descrição"
+                value={form.descricao}
+                onChange={handleChange}
+            />
+
+            <textarea
+                name="observacao"
+                placeholder="Observações (opcional)"
+                value={form.observacao}
+                onChange={handleChange}
+            />
+
+            <input
+                name="valor"
+                type="number"
+                placeholder="Valor"
+                value={form.valor}
+                onChange={handleChange}
+            />
+
+            <input
+                name="vencimento"
+                type="date"
+                value={form.vencimento}
+                onChange={handleChange}
+            />
+
+            <select
+                name="prioridade"
+                value={form.prioridade}
+                onChange={handleChange}
+            >
+
+                <option value="baixa">
+
+                    Baixa
+
+                </option>
+
+                <option value="media">
+
+                    Média
+
+                </option>
+
+                <option value="alta">
+
+                    Alta
+
+                </option>
+
+            </select>
+
+            <select
+                name="status"
+                value={form.status}
+                onChange={handleChange}
+            >
+
+                <option value="pendente">
+
+                    Pendente
+
+                </option>
+
+                <option value="pago">
+
+                    Quitado
+
+                </option>
+
+            </select>
+
+            <div className="wizard-buttons">
+
+                <button onClick={onClose}>
+
+                    Cancelar
+
+                </button>
+
+                <button onClick={salvar}>
+
+                    Salvar
+
+                </button>
+
+            </div>
+
+        </div>
+
+    );
+
+}
+
+export default LoanModal;
+
+
+==================================================
+ARQUIVO: src\components\Modal.jsx
+==================================================
+import "../styles/modal.css";
+
+
+function Modal({ isOpen, onClose, children }) {
+    if (!isOpen) return null;
+  
+    return (
+      <div className="modal-overlay">
+        <div className="modal">
+  
+          <button
+            className="close-button"
+            onClick={onClose}
+          >
+            ✖
+          </button>
+  
+          {children}
+  
+        </div>
+      </div>
+    );
+  }
+  
+  export default Modal;
+
+
+==================================================
+ARQUIVO: src\components\modal\ModalWizard.jsx
+==================================================
+import { useState, useEffect } from "react";
+
+import WizardStepType from "./WizardStepType";
+import WizardStepInfo from "./WizardStepInfo";
+import WizardStepReview from "./WizardStepReview";
+import {
+
+  createTransactions,
+
+  getTransactions,
+
+} from "../../services/transactionService";
+
+import { parseCurrency } from "../../utils/parseCurrency";
+
+import {
+  getCategories,
+  createCategory,
+  deleteCategory,
+  updateCategory,
+} from "../../services/categoryService";
+
+function ModalWizard({
+  user,
+  transactions,
+  setTransactions,
+  onClose,
+}) {
+
+  const [step, setStep] = useState(1);
+
+  const [formData, setFormData] = useState({
+    tipo: "",
+    categoria: "",
+    descricao: "",
+    valor: "",
+    data: "",
+    observacao: "",
+  });
+  const [categories, setCategories] = useState([]);
+
+  const [pendingTransactions, setPendingTransactions] = useState([]);
+
+  function adicionarMovimentacao() {
+
+    setPendingTransactions((prev) => [
+
+      ...prev,
+
+      {
+
+        ...formData,
+
+        id: crypto.randomUUID(),
+
+        valor: parseCurrency(formData.valor),
+
+        user_id: user.id,
+
+      },
+
+    ]);
+
+    setFormData({
+
+      tipo: "",
+      categoria: "",
+      descricao: "",
+      valor: "",
+      data: "",
+      observacao: "",
+
+    });
+
+    setStep(1);
+
+  }
+
+  useEffect(() => {
+
+    
+
+    if (!user) return;
+
+    loadCategories();
+
+}, [user]);
+
+   function validarFormulario() {
+
+      if (!formData.categoria) return "Selecione uma categoria.";
+
+      if (!formData.descricao.trim()) return "Informe uma descrição.";
+
+      if (!formData.valor) return "Informe um valor.";
+
+      if (!formData.data) return "Informe uma data.";
+
+      return null;
+
+    }
+
+async function loadCategories() {
+
+  try {
+
+      const data = await getCategories(user.id);
+
+      setCategories(data);
+
+  } catch (err) {
+
+      console.error(err);
+
+  }
+
+}
+
+async function addCategory(nome, tipo) {
+
+  try {
+
+      await createCategory({
+
+          nome,
+          tipo,
+          prioridade: false,
+          user_id: user.id,
+
+      });
+
+      await loadCategories();
+
+  } catch (err) {
+
+      console.error(err);
+
+  }
+
+}
+
+async function editarCategoria(category) {
+  const novoNome = prompt(
+      "Novo nome da categoria:",
+      category.nome
+  );
+
+  if (!novoNome || !novoNome.trim()) {
+      return;
+  }
+
+  try {
+      await updateCategory(category.id, {
+          nome: novoNome.trim(),
+      });
+
+      await loadCategories();
+
+  } catch (err) {
+      console.error("Erro ao editar categoria:", err);
+      alert("Erro ao editar categoria.");
+  }
+}
+
+async function removerCategoria(category) {
+  const confirmar = window.confirm(
+      `Excluir a categoria "${category.nome}"?`
+  );
+
+  if (!confirmar) return;
+
+  try {
+      await deleteCategory(category.id);
+
+      if (formData.categoria === category.nome) {
+          setFormData((prev) => ({
+              ...prev,
+              categoria: "",
+          }));
+      }
+
+      await loadCategories();
+
+  } catch (err) {
+      console.error("Erro ao excluir categoria:", err);
+      alert("Erro ao excluir categoria.");
+  }
+}
+
+async function confirmarTudo() {
+
+  const erro = validarFormulario();
+
+  if (erro) {
+
+      alert(erro);
+
+      return;
+
+  }
+
+  const todas = [...pendingTransactions];
+
+  todas.push({
+
+      ...formData,
+
+      id: crypto.randomUUID(),
+
+      valor: parseCurrency(formData.valor),
+
+      user_id: user.id,
+
+  });
+
+  try {
+
+      await createTransactions(todas);
+
+      const data = await getTransactions(user.id);
+
+      setTransactions(data);
+
+      onClose();
+
+  } catch (err) {
+
+      console.error(err);
+
+      alert("Erro ao salvar as movimentações.");
+
+  }
+
+}
+
+  console.log("Categorias do Modal:", categories);
+
+  return (
+
+    <div>
+
+      <h2>Nova Movimentação</h2>
+
+      <p>Etapa {step} de 3</p>
+
+      {step === 1 && (
+
+        <WizardStepType
+          formData={formData}
+          setFormData={setFormData}
+          setStep={setStep}
+        />
+
+      )}
+
+      {step === 2 && (
+
+      <WizardStepInfo
+      formData={formData}
+      setFormData={setFormData}
+      categories={categories}
+      addCategory={addCategory}
+      editarCategoria={editarCategoria}
+      removerCategoria={removerCategoria}
+      />
+
+      )}
+
+      {step === 3 && (
+
+        <WizardStepReview
+          formData={formData}
+          pendingTransactions={pendingTransactions}
+          adicionarMovimentacao={adicionarMovimentacao}
+          confirmarTudo={confirmarTudo}
+        />
+
+      )}
+
+      <div className="wizard-buttons">
+
+        {step > 1 && (
+
+          <button
+            onClick={() => setStep(step - 1)}
+          >
+            ⬅ Voltar
+          </button>
+
+        )}
+
+        {step > 1 && step < 3 && (
+
+    <button
+    onClick={() => {
+
+        if(step === 2){
+
+            if(!formData.categoria){
+
+                alert("Selecione uma categoria.");
+
+                return;
+
+            }
+
+            if(!formData.descricao.trim()){
+
+                alert("Informe uma descrição.");
+
+                return;
+
+            }
+
+            if(!formData.valor){
+
+                alert("Informe um valor.");
+
+                return;
+
+            }
+
+            if(!formData.data){
+
+                alert("Informe uma data.");
+
+                return;
+
+            }
+
+        }
+
+        setStep(step + 1);
+
+    }}
+    >
+
+    Próximo ➜
+
+    </button>
+
+        )}
+
+      </div>
+
+    </div>
+
+  );
+
+}
+
+export default ModalWizard;
+
+
+==================================================
+ARQUIVO: src\components\modal\WizardStepInfo.jsx
+==================================================
+import { useState } from "react";
+import CurrencyInput from "react-currency-input-field";
+
+function WizardStepInfo({
+    formData,
+    setFormData,
+    categories,
+    addCategory,
+    editarCategoria,
+    removerCategoria,
+}) {
+    const categorias = {
+        entrada: [
+            "Salário",
+            "Freelance",
+            "Venda",
+            "Presente",
+            "Outros",
+        ],
+
+        saida: [
+            "Mercado",
+            "Moradia",
+            "Transporte",
+            "Saúde",
+            "Lazer",
+            "Educação",
+            "Internet",
+            "Outros",
+        ],
+
+        investimento: [
+            "Tesouro",
+            "CDB",
+            "Ações",
+            "ETF",
+            "FII",
+            "Bitcoin",
+        ],
+
+        renda_passiva: [
+            "Dividendos",
+            "Aluguel",
+            "Juros",
+            "Royalties",
+        ],
+    };
+
+    const [novaCategoria, setNovaCategoria] = useState("");
+    const [criandoCategoria, setCriandoCategoria] = useState(false);
+
+    const categoriasPadrao =
+        categorias[formData.tipo] || [];
+
+    const categoriasUsuario = categories.filter(
+        (c) => c.tipo === formData.tipo
+    );
+
+    const categoriaUsuarioSelecionada =
+        categoriasUsuario.find(
+            (c) => c.nome === formData.categoria
+        );
+
+    function selecionarCategoriaPadrao(valor) {
+        setFormData((prev) => ({
+            ...prev,
+            categoria: valor,
+        }));
+
+        setCriandoCategoria(false);
+    }
+
+    function selecionarCategoriaUsuario(e) {
+        const valor = e.target.value;
+
+        if (valor === "__criar__") {
+            setCriandoCategoria(true);
+
+            setFormData((prev) => ({
+                ...prev,
+                categoria: "",
+            }));
+
+            return;
+        }
+
+        setCriandoCategoria(false);
+
+        setFormData((prev) => ({
+            ...prev,
+            categoria: valor,
+        }));
+    }
+
+    async function criarNovaCategoria() {
+        const nome = novaCategoria.trim();
+
+        if (!nome) {
+            return;
+        }
+
+        try {
+            await addCategory(nome, formData.tipo);
+
+            setFormData((prev) => ({
+                ...prev,
+                categoria: nome,
+            }));
+
+            setNovaCategoria("");
+            setCriandoCategoria(false);
+        } catch (err) {
+            console.error(
+                "Erro ao criar categoria:",
+                err
+            );
+        }
+    }
+
+    return (
+        <div>
+
+            <h2>
+                {formData.tipo === "entrada" &&
+                    "Nova Entrada"}
+
+                {formData.tipo === "saida" &&
+                    "Nova Saída"}
+
+                {formData.tipo === "investimento" &&
+                    "Novo Investimento"}
+
+                {formData.tipo === "renda_passiva" &&
+                    "Nova Renda Passiva"}
+            </h2>
+
+            <div className="category-section">
+
+                {/* CATEGORIAS PADRÃO */}
+
+                <span className="category-title">
+                    Categorias padrão
+                </span>
+
+                <select
+                    className="category-select"
+                    value={
+                        categoriasPadrao.includes(
+                            formData.categoria
+                        )
+                            ? formData.categoria
+                            : ""
+                    }
+                    onChange={(e) =>
+                        selecionarCategoriaPadrao(
+                            e.target.value
+                        )
+                    }
+                >
+                    <option value="">
+                        Categoria
+                    </option>
+
+                    {categoriasPadrao.map(
+                        (categoria) => (
+                            <option
+                                key={`padrao-${categoria}`}
+                                value={categoria}
+                            >
+                                {categoria}
+                            </option>
+                        )
+                    )}
+                </select>
+
+
+                {/* MINHAS CATEGORIAS */}
+
+                <span className="category-title">
+                    Minhas categorias
+                </span>
+
+                <div className="custom-category-select">
+
+                    <select
+                        className="category-select"
+                        value={
+                            criandoCategoria
+                                ? "__criar__"
+                                : categoriaUsuarioSelecionada
+                                    ? formData.categoria
+                                    : ""
+                        }
+                        onChange={
+                            selecionarCategoriaUsuario
+                        }
+                    >
+
+                        <option value="">
+                            Categoria
+                        </option>
+
+                        <option value="__criar__">
+                            ＋ Criar categoria
+                        </option>
+
+                        {categoriasUsuario.map(
+                            (categoria) => (
+                                <option
+                                    key={categoria.id}
+                                    value={categoria.nome}
+                                >
+                                    {categoria.nome}
+                                </option>
+                            )
+                        )}
+
+                    </select>
+
+
+                    {/* AÇÕES DA CATEGORIA */}
+
+                    {categoriaUsuarioSelecionada &&
+                        !criandoCategoria && (
+                            <div className="category-actions">
+
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        editarCategoria(
+                                            categoriaUsuarioSelecionada
+                                        )
+                                    }
+                                    title="Editar"
+                                >
+                                    ✏️
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        removerCategoria(
+                                            categoriaUsuarioSelecionada
+                                        )
+                                    }
+                                    title="Excluir"
+                                >
+                                    🗑️
+                                </button>
+
+                            </div>
+                        )}
+
+                </div>
+
+
+                {/* CRIAR CATEGORIA */}
+
+                {criandoCategoria && (
+                    <div className="new-category">
+
+                        <input
+                            placeholder="Nome da categoria"
+                            value={novaCategoria}
+                            onChange={(e) =>
+                                setNovaCategoria(
+                                    e.target.value
+                                )
+                            }
+                            autoFocus
+                        />
+
+                        <button
+                            type="button"
+                            onClick={
+                                criarNovaCategoria
+                            }
+                        >
+                            Adicionar
+                        </button>
+
+                    </div>
+                )}
+
+            </div>
+
+
+            {/* DESCRIÇÃO */}
+
+            <input
+                placeholder="Descrição *"
+                value={formData.descricao}
+                onChange={(e) =>
+                    setFormData({
+                        ...formData,
+                        descricao:
+                            e.target.value,
+                    })
+                }
+                required
+            />
+
+
+            {/* VALOR */}
+
+            <CurrencyInput
+                placeholder="Valor"
+                prefix="R$ "
+                decimalsLimit={2}
+                decimalSeparator=","
+                groupSeparator="."
+                value={formData.valor}
+                onValueChange={(value) =>
+                    setFormData({
+                        ...formData,
+                        valor: value || "",
+                    })
+                }
+                className="currency-input"
+            />
+
+
+            {/* DATA */}
+
+            <input
+                type="date"
+                value={formData.data}
+                onChange={(e) =>
+                    setFormData({
+                        ...formData,
+                        data: e.target.value,
+                    })
+                }
+            />
+
+
+            {/* OBSERVAÇÃO */}
+
+            <textarea
+                placeholder="Observações"
+                value={formData.observacao}
+                onChange={(e) =>
+                    setFormData({
+                        ...formData,
+                        observacao:
+                            e.target.value,
+                    })
+                }
+            />
+
+        </div>
+    );
+}
+
+export default WizardStepInfo;
+
+
+==================================================
+ARQUIVO: src\components\modal\WizardStepReview.jsx
+==================================================
+function WizardStepReview({
+  formData,
+  pendingTransactions,
+  adicionarMovimentacao,
+  confirmarTudo,
+}) {
+
+  const total =
+    pendingTransactions.reduce(
+      (acc, item) => acc + item.valor,
+      0
+    ) + Number(formData.valor || 0);
+
+  return (
+    <div>
+
+      <h2>Resumo</h2>
+
+      <h4>Movimentação Atual</h4>
+
+      <p><strong>Tipo:</strong> {formData.tipo}</p>
+
+      <p><strong>Categoria:</strong> {formData.categoria}</p>
+
+      <p><strong>Descrição:</strong> {formData.descricao}</p>
+
+      <p><strong>Valor:</strong> R$ {Number(formData.valor).toFixed(2)}</p>
+
+      <hr />
+
+      <h4>Movimentações adicionadas</h4>
+
+      {pendingTransactions.length === 0 ? (
+
+        <p>Nenhuma movimentação adicionada.</p>
+
+      ) : (
+
+        pendingTransactions.map((item) => (
+
+          <div
+            key={item.id}
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              marginBottom: 8,
+            }}
+          >
+            <div>
+
+              <strong>{item.descricao}</strong>
+
+              <br />
+
+              <small>{item.categoria}</small>
+
+            </div>
+
+            <strong>
+              {item.valor.toLocaleString(
+                "pt-BR",
+                {
+                  style: "currency",
+                  currency: "BRL",
+                }
+              )}
+            </strong>
+
+          </div>
+
+        ))
+
+      )}
+
+      <hr />
+
+      <h3>
+        Total: {total.toLocaleString(
+          "pt-BR",
+          {
+            style: "currency",
+            currency: "BRL",
+          }
+        )}
+      </h3>
+
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          marginTop: 20,
+        }}
+      >
+
+        <button
+          onClick={adicionarMovimentacao}
+        >
+          ➕ Adicionar outra
+        </button>
+
+        <button
+          onClick={confirmarTudo}
+        >
+          ✅ Confirmar Tudo
+        </button>
+
+      </div>
+
+    </div>
+  );
+}
+
+export default WizardStepReview;
+
+
+==================================================
+ARQUIVO: src\components\modal\WizardStepType.jsx
+==================================================
+function WizardStepType({
+  formData,
+  setFormData,
+  setStep,
+}) {
+  const tipos = [
+    {
+      id: "entrada",
+      titulo: "🟢 Entrada",
+      descricao: "Recebimentos de qualquer origem.",
+    },
+    {
+      id: "saida",
+      titulo: "🔴 Saída",
+      descricao: "Despesas e pagamentos.",
+    },
+    {
+      id: "investimento",
+      titulo: "🟡 Investimento",
+      descricao: "Aplicações financeiras.",
+    },
+    {
+      id: "renda_passiva",
+      titulo: "🔵 Renda Passiva",
+      descricao: "Ganhos automáticos.",
+    },
+  ];
+
+  function selecionarTipo(tipo) {
+    setFormData({
+      ...formData,
+      tipo,
+    });
+
+    setStep(2);
+  }
+
+  return (
+    <div>
+
+      <h2>Escolha o tipo da movimentação</h2>
+
+      <div className="wizard-type-grid">
+
+        {tipos.map((tipo) => (
+
+          <button
+            key={tipo.id}
+            className="wizard-type-card"
+            onClick={() => selecionarTipo(tipo.id)}
+          >
+
+            <h3>{tipo.titulo}</h3>
+
+            <p>{tipo.descricao}</p>
+
+          </button>
+
+        ))}
+
+      </div>
+
+    </div>
+  );
+}
+
+export default WizardStepType;
+
+
+==================================================
+ARQUIVO: src\components\ModalTransaction.jsx
+==================================================
+
+
+==================================================
+ARQUIVO: src\components\ScheduledBillModal.jsx
+==================================================
+import { useEffect, useState } from "react";
+
+function ScheduledBillModal({
+    bill,
+    onSave,
+    onClose,
+}) {
+
+    const [form, setForm] = useState({
+        nome: "",
+        categoria: "",
+        valor: "",
+        tipo: "saida",
+        vencimento: "",
+        recorrencia: "mensal",
+        dias_lembrete: 3,
+        ativo: true,
+    });
+
+    useEffect(() => {
+
+        if (!bill) {
+
+            setForm({
+                nome: "",
+                categoria: "",
+                valor: "",
+                tipo: "saida",
+                vencimento: "",
+                recorrencia: "mensal",
+                dias_lembrete: 3,
+                ativo: true,
+            });
+
+            return;
+
+        }
+
+        setForm({
+            nome: bill.nome || "",
+            categoria: bill.categoria || "",
+            valor: bill.valor || "",
+            tipo: bill.tipo || "saida",
+            vencimento: bill.vencimento || "",
+            recorrencia: bill.recorrencia || "mensal",
+            dias_lembrete: bill.dias_lembrete ?? 3,
+            ativo: bill.ativo ?? true,
+        });
+
+    }, [bill]);
+
+    function handleChange(event) {
+
+        const { name, value } = event.target;
+
+        setForm({
+            ...form,
+            [name]: value,
+        });
+
+    }
+
+    async function salvar() {
+
+        if (!form.nome.trim()) {
+            alert("Informe o nome da conta.");
+            return;
+        }
+
+        if (!form.valor) {
+            alert("Informe o valor.");
+            return;
+        }
+
+        if (!form.vencimento) {
+            alert("Informe o vencimento.");
+            return;
+        }
+
+        if (!form.categoria.trim()) {
+            alert("Informe a categoria.");
+            return;
+        }
+
+        await onSave({
+            ...bill,
+            ...form,
+            valor: Number(form.valor),
+            dias_lembrete: Number(form.dias_lembrete),
+        });
+
+    }
+
+    return (
+        <div>
+
+            <h2>
+                {bill ? "Editar conta" : "Nova conta"}
+            </h2>
+
+            <input
+                name="nome"
+                placeholder="Nome da conta"
+                value={form.nome}
+                onChange={handleChange}
+            />
+
+            <input
+                name="categoria"
+                placeholder="Categoria"
+                value={form.categoria}
+                onChange={handleChange}
+            />
+
+            <input
+                name="valor"
+                type="number"
+                step="0.01"
+                placeholder="Valor"
+                value={form.valor}
+                onChange={handleChange}
+            />
+
+            <label>
+                Tipo
+            </label>
+
+            <select
+                name="tipo"
+                value={form.tipo}
+                onChange={handleChange}
+            >
+
+                <option value="saida">
+                    Saída
+                </option>
+
+                <option value="entrada">
+                    Entrada
+                </option>
+
+            </select>
+
+            <label>
+                Vencimento
+            </label>
+
+            <input
+                name="vencimento"
+                type="date"
+                value={form.vencimento}
+                onChange={handleChange}
+            />
+
+            <label>
+                Recorrência
+            </label>
+
+            <select
+                name="recorrencia"
+                value={form.recorrencia}
+                onChange={handleChange}
+            >
+
+                <option value="unica">
+                    Única
+                </option>
+
+                <option value="mensal">
+                    Mensal
+                </option>
+
+            </select>
+
+            <label>
+                Lembrar com antecedência
+            </label>
+
+            <select
+                name="dias_lembrete"
+                value={form.dias_lembrete}
+                onChange={handleChange}
+            >
+
+                <option value="1">
+                    1 dia antes
+                </option>
+
+                <option value="3">
+                    3 dias antes
+                </option>
+
+                <option value="5">
+                    5 dias antes
+                </option>
+
+                <option value="7">
+                    7 dias antes
+                </option>
+
+            </select>
+
+            <div className="wizard-buttons">
+
+                <button onClick={onClose}>
+                    Cancelar
+                </button>
+
+                <button onClick={salvar}>
+                    Salvar
+                </button>
+
+            </div>
+
+        </div>
+    );
+
+}
+
+export default ScheduledBillModal;
+
+
+==================================================
+ARQUIVO: src\components\SplashScreen.jsx
+==================================================
+import BrandLogo from "./BrandLogo";
+
+function SplashScreen(){
+
+  return(
+
+    <div className="splash-screen">
+
+      <BrandLogo
+        type="atlas"
+        size={140}
+        className="splash-logo"
+      />
+
+      <h2>Atlas Finance</h2>
+
+    </div>
+
+  );
+
+}
+
+export default SplashScreen;
+
+
+==================================================
+ARQUIVO: src\components\TransactionForm.jsx
+==================================================
+import { useState } from "react";
+import { v4 as uuidv4 } from "uuid";
+
+
+function TransactionForm({
+  transactions,
+  setTransactions,
+  onSave,
+}) {
+
+  const [descricao, setDescricao] = useState("");
+  const [valor, setValor] = useState("");
+  const [categoria, setCategoria] = useState("");
+  const [tipo, setTipo] = useState("entrada");
+  const [data, setData] = useState("");
+  const [observacao, setObservacao] = useState("");
+
+    function salvarTransacao() {
+
+      if (!descricao || !valor || !categoria || !data) {
+        alert("Preencha todos os campos.");
+        return;
+      }
+
+      const novaTransacao = {
+        id: uuidv4(),
+        descricao,
+        valor: Number(valor),
+        categoria,
+        tipo,
+        data,
+        observacao,
+        
+      };
+    
+      setTransactions((prevTransactions) => [
+        ...prevTransactions,
+        novaTransacao,
+      ]);
+    
+      // Limpa o formulário
+      setDescricao("");
+      setValor("");
+      setCategoria("");
+      setTipo("entrada");
+      setData("");
+      setObservacao("");
+      onSave();
+    }
+
+  return (
+    <div className="transaction-form">
+
+      <h2>Nova Transação</h2>
+
+      <input
+        type="text"
+        placeholder="Descrição"
+        value={descricao}
+        onChange={(e) =>
+          setDescricao(e.target.value)
+        }
+      />
+
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        placeholder="Valor"
+        value={valor}
+        onChange={(e) =>
+          setValor(e.target.value)
+        }
+      />
+
+      <input
+        type="text"
+        placeholder="Categoria"
+        value={categoria}
+        onChange={(e) => setCategoria(e.target.value)}
+      />
+
+      <input
+        type="date"
+        value={data}
+        onChange={(e) => setData(e.target.value)}
+      />
+
+      <textarea
+        placeholder="Observação"
+        value={observacao}
+        onChange={(e) => setObservacao(e.target.value)}
+      ></textarea>
+
+<select
+   value={tipo}
+   onChange={(e) => setTipo(e.target.value)}
+  
+>
+
+  <option value="entrada">
+    Entrada
+  </option>
+
+  <option value="saida">
+    Saída
+  </option>
+
+  <option value="investimento">
+    Investimento
+  </option>
+
+  <option value="renda_passiva">
+    Renda Passiva
+  </option>
+
+</select>
+
+      <button
+        onClick={salvarTransacao}
+      >
+        Salvar
+      </button>
+
+    </div>
+
+    
+  );
+
+  
+}
+
+
+
+export default TransactionForm;
+
+
+==================================================
+ARQUIVO: src\components\TransactionItem.jsx
+==================================================
+import "../styles/transactionItem.css";
+
+function TransactionItem({
+    transaction,
+    deleteTransaction,
+    editTransaction,
+}) {
+
+    const cores = {
+        entrada: "#22c55e",
+        saida: "#ef4444",
+        investimento: "#facc15",
+        renda_passiva: "#3b82f6",
+    };
+
+    return (
+        <div className="transaction-item">
+
+            <div className="transaction-left">
+
+                <span
+                    className="transaction-dot"
+                    style={{
+                        background: cores[transaction.tipo],
+                    }}
+                />
+
+                <div>
+
+                    <h3>
+                        {transaction.descricao}
+                    </h3>
+
+                    <small>
+                        {transaction.categoria}
+                    </small>
+
+                    <div className="transaction-date">
+                        {new Date(
+                            transaction.data + "T00:00:00"
+                        ).toLocaleDateString("pt-BR")}
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div className="transaction-right">
+
+                <h3>
+                    {transaction.valor.toLocaleString(
+                        "pt-BR",
+                        {
+                            style: "currency",
+                            currency: "BRL",
+                        }
+                    )}
+                </h3>
+
+                <div>
+
+                    <button
+                        onClick={() =>
+                            editTransaction(transaction)
+                        }
+                    >
+                        ✏️
+                    </button>
+
+                    <button
+                        onClick={() =>
+                            deleteTransaction(transaction.id)
+                        }
+                    >
+                        🗑️
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+    );
+}
+
+export default TransactionItem;
+
+
+==================================================
+ARQUIVO: src\components\TransactionList.jsx
+==================================================
+import TransactionItem from "./TransactionItem";
+
+function TransactionList({
+  transactions,
+  deleteTransaction,
+  editTransaction,
+}) {
+  return (
+    <section className="transactions">
+      <h2>Últimas Transações</h2>
+
+      {transactions.map((transaction) => (
+        <TransactionItem
+          key={transaction.id}
+          transaction={transaction}
+          deleteTransaction={deleteTransaction}
+          editTransaction={editTransaction}
+        />
+      ))}
+    </section>
+  );
+}
+
+export default TransactionList;
+
+
+==================================================
+ARQUIVO: src\components\UpcomingEvents.jsx
+==================================================
+
+
+==================================================
+ARQUIVO: src\index.css
+==================================================
+*{
+
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+}
+
+body{
+
+  margin:0;
+
+  background:#09090B;
+
+  color:white;
+
+  font-family:Inter,sans-serif;
+
+}
+
+.header {
+  padding: 2rem;
+  text-align: center;
+}
+
+.header{
+
+  position:sticky;
+
+  top:15px;
+
+  z-index:100;
+
+  width:95%;
+
+  margin:20px auto;
+
+  padding:18px 28px;
+
+  display:flex;
+
+  justify-content:space-between;
+
+  align-items:center;
+
+  border-radius:18px;
+
+  background:rgba(24,24,27,.75);
+
+  backdrop-filter:blur(18px);
+
+  border:1px solid rgba(255,255,255,.06);
+
+  box-shadow:
+
+      0 12px 35px rgba(0,0,0,.25);
+
+  animation:headerFade .6s ease;
+
+}
+
+@keyframes headerFade{
+
+  from{
+
+      opacity:0;
+
+      transform:translateY(-20px);
+
+  }
+
+  to{
+
+      opacity:1;
+
+      transform:translateY(0);
+
+  }
+
+}
+
+.header h1{
+
+  font-size:24px;
+
+  font-weight:700;
+
+  letter-spacing:.6px;
+
+  color:white;
+
+}
+
+.header p{
+
+  color:#9ca3af;
+
+  margin-top:4px;
+
+}
+
+.header-right{
+
+  display:flex;
+
+  align-items:center;
+
+  gap:14px;
+
+}
+
+.logout-btn{
+
+  padding:10px 18px;
+
+  border:none;
+
+  border-radius:12px;
+
+  background:#27272a;
+
+  color:white;
+
+  transition:.25s;
+
+}
+
+.logout-btn:hover{
+
+  background:#ef4444;
+
+}
+
+.header::after{
+
+  content:"";
+
+  position:absolute;
+
+  left:0;
+
+  bottom:0;
+
+  width:100%;
+
+  height:1px;
+
+  background:
+
+  linear-gradient(
+
+      90deg,
+
+      transparent,
+
+      rgba(255,255,255,.12),
+
+      transparent
+
+  );
+
+}
+
+.dashboard {
+  padding: 1rem;
+}
+
+.cards {
+  display: flex;
+  gap: 1rem;
+}
+
+button{
+
+  transition:.2s;
+  
+  }
+  
+  button:hover{
+  
+  transform:translateY(-2px);
+  
+  }
+
+  .filter-toggle{
+
+    margin:15px 25px 0;
+
+}
+
+.filter-toggle button{
+
+    background:#202124;
+
+    color:white;
+
+    border:1px solid #3b3b3b;
+
+    border-radius:10px;
+
+    padding:8px 14px;
+
+    cursor:pointer;
+
+}
+
+.filter-toggle button:hover{
+
+    background:#2b2b2b;
+
+}
+
+.card {
+  background: #1f2937;
+  padding: 1rem;
+  border-radius: 12px;
+  flex: 1;
+}
+
+.transactions {
+  padding: 1rem;
+}
+
+.transaction {
+  background: #1f2937;
+  margin-top: 10px;
+  padding: 1rem;
+  border-radius: 10px;
+
+  display: flex;
+  justify-content: space-between;
+}
+
+button {
+  margin-top: 20px;
+
+  width: 100%;
+
+  padding: 12px;
+
+  border: none;
+
+  border-radius: 10px;
+
+  cursor: pointer;
+}
+
+.currency-input{
+
+  width:100%;
+  
+  padding:14px;
+  
+  border-radius:10px;
+  
+  border:1px solid #333;
+  
+  background:#222;
+  
+  color:white;
+  
+  font-size:17px;
+  
+  outline:none;
+  
+  transition:.2s;
+  
+  }
+  
+  .currency-input:focus{
+  
+  border-color:#4ade80;
+  
+  box-shadow:0 0 12px rgba(74,222,128,.35);
+  
+  }
+
+  .goal-bar{
+
+    margin-top:15px;
+
+    width:100%;
+
+    height:10px;
+
+    border-radius:20px;
+
+    background:#303030;
+
+    overflow:hidden;
+
+}
+
+.goal-progress{
+
+  height:100%;
+
+  background:linear-gradient(
+      90deg,
+      #00d26a,
+      #56ff96
+  );
+
+  transition:.5s;
+
+}
+
+/* ===================================== */
+/* BOTÕES */
+/* ===================================== */
+
+button{
+
+  cursor:pointer;
+
+  transition:
+      transform .18s ease,
+      box-shadow .18s ease,
+      background-color .18s ease,
+      border-color .18s ease;
+
+}
+
+button:hover{
+
+  transform:translateY(-2px);
+
+}
+
+button:active{
+
+  transform:scale(.97);
+
+}
+
+.new-transaction-btn{
+
+  background:#7c3aed;
+
+  color:white;
+
+  border:none;
+
+  border-radius:12px;
+
+  padding:12px 22px;
+
+  font-weight:600;
+
+  transition:
+      transform .18s,
+      box-shadow .18s,
+      background .18s;
+
+}
+
+.new-transaction-btn:hover{
+
+  background:#8b5cf6;
+
+  box-shadow:
+
+      0 10px 22px rgba(124,58,237,.35);
+
+     
+}
+
+.new-transaction-btn:active{
+
+  transform:scale(.96);
+
+}
+
+.wizard-buttons button{
+
+  min-width:120px;
+
+  transition:.18s;
+
+}
+
+.wizard-buttons button:hover{
+
+  transform:translateY(-2px);
+
+}
+
+.wizard-buttons button:active{
+
+  transform:scale(.96);
+
+}
+
+button{
+
+  transition:
+      transform .18s ease,
+      box-shadow .25s ease,
+      background .25s ease,
+      border-color .25s ease;
+
+}
+
+button:hover{
+
+  transform:translateY(-2px);
+
+}
+
+button:active{
+
+  transform:scale(.96);
+
+}
+
+input,
+select,
+textarea{
+
+    transition:
+
+        border-color .25s ease,
+
+        box-shadow .25s ease,
+
+        background .25s ease;
+
+}
+
+input:focus,
+select:focus,
+textarea:focus{
+
+    outline:none;
+
+    border-color:#8b5cf6;
+
+    box-shadow:
+
+        0 0 0 3px rgba(139,92,246,.18);
+
+}
+
+::placeholder{
+
+  color:#777;
+
+  transition:.25s;
+
+}
+
+input:focus::placeholder,
+
+textarea:focus::placeholder{
+
+  opacity:.45;
+
+}
+
+select{
+
+  cursor:pointer;
+
+}
+
+button{
+
+  cursor:pointer;
+
+}
+
+button:disabled{
+
+  cursor:not-allowed;
+
+  opacity:.5;
+
+}
+
+::-webkit-scrollbar-thumb{
+
+  background:#555;
+
+  border-radius:20px;
+
+  transition:.3s;
+
+}
+
+::-webkit-scrollbar-thumb:hover{
+
+  background:#8b5cf6;
+
+}
+
+::selection{
+
+  background:#8b5cf6;
+
+  color:white;
+
+}
+
+a{
+
+  transition:.2s;
+
+}
+
+a:hover{
+
+  opacity:.75;
+
+}
+
+/* Área de histórico discreta e recolhida por padrão */
+.history-cleanup {
+  margin-top: 12px;
+  padding: 0;
+  border: 1px solid var(--border-color, #303030);
+  border-radius: 10px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.history-cleanup-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+  list-style: none;
+  color: #999;
+  font-size: 13px;
+  user-select: none;
+}
+
+.history-cleanup-summary::-webkit-details-marker {
+  display: none;
+}
+
+.history-cleanup-summary:hover {
+  color: #ccc;
+}
+
+.history-cleanup-arrow {
+  transition: transform 0.2s ease;
+}
+
+.history-cleanup[open] .history-cleanup-arrow {
+  transform: rotate(180deg);
+}
+
+.history-cleanup-content {
+  padding: 0 14px 14px;
+}
+
+.history-cleanup-content p {
+  color: #999;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.history-cleanup-content label {
+  display: block;
+  margin-bottom: 6px;
+  color: #aaa;
+  font-size: 12px;
+}
+
+/* Botão de limpeza pequeno e secundário */
+.history-cleanup .history-cleanup-btn {
+  display: inline-flex;
+  width: auto;
+  min-height: 0;
+  padding: 6px 10px;
+  margin-top: 8px;
+  border: 1px solid #444;
+  border-radius: 6px;
+  background: transparent;
+  color: #999;
+  font-size: 11px;
+  font-weight: 400;
+  box-shadow: none;
+  opacity: 0.8;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.history-cleanup .history-cleanup-btn:hover:not(:disabled) {
+  background: #292929;
+  color: #ddd;
+  opacity: 1;
+}
+
+.history-cleanup .history-cleanup-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.history-cleanup-content small {
+  display: block;
+  margin-top: 8px;
+  color: #777;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+
+==================================================
+ARQUIVO: src\main.jsx
+==================================================
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import "./styles/theme.css";
+import App from './App.jsx'
+
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)
+
+
+
+==================================================
+ARQUIVO: src\pages\Profile.jsx
+==================================================
+
+import { useEffect, useRef, useState } from "react";
+import { supabase } from "../services/supabase";
+import "../styles/profile.css";
+
+const AVATAR_BUCKET = "avatars";
+const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
+const SIGNED_URL_SECONDS = 60 * 60;
+
+function Profile() {
+  const fileInputRef = useRef(null);
+
+  const [user, setUser] = useState(null);
+  const [nome, setNome] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarPath, setAvatarPath] = useState("");
+  const [tema, setTema] = useState("dark");
+  const [idioma, setIdioma] = useState("pt-BR");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProfile() {
+      try {
+        const { data, error } = await supabase.auth.getUser();
+
+        if (error) throw error;
+
+        if (!data.user) {
+          if (!cancelled) {
+            setErrorMessage("Não foi possível carregar sua conta.");
+          }
+          return;
+        }
+
+        const currentUser = data.user;
+        const metadata = currentUser.user_metadata || {};
+        const savedPath = metadata.avatar_path || "";
+
+        let signedUrl = "";
+
+        if (savedPath) {
+          const { data: signedData, error: signedError } =
+            await supabase.storage
+              .from(AVATAR_BUCKET)
+              .createSignedUrl(savedPath, SIGNED_URL_SECONDS);
+
+          if (!signedError) {
+            signedUrl = signedData?.signedUrl || "";
+          } else {
+            console.error(
+              "Não foi possível carregar a foto:",
+              signedError.message
+            );
+          }
+        } else if (metadata.avatar_url) {
+          // Compatibilidade com perfis antigos que usam URL pública.
+          signedUrl = metadata.avatar_url;
+        }
+
+        let savedTheme = "dark";
+        let savedLanguage = "pt-BR";
+
+        try {
+          const storedTheme = localStorage.getItem("atlas-theme");
+          const storedLanguage = localStorage.getItem("atlas-language");
+
+          if (["dark", "light", "system"].includes(storedTheme)) {
+            savedTheme = storedTheme;
+          }
+
+          if (["pt-BR", "en", "es"].includes(storedLanguage)) {
+            savedLanguage = storedLanguage;
+          }
+        } catch {
+          // As preferências padrão continuam disponíveis.
+        }
+
+        if (cancelled) return;
+
+        setUser(currentUser);
+        setNome(metadata.full_name || metadata.name || "");
+        setAvatarPath(savedPath);
+        setAvatarUrl(signedUrl);
+        setTema(savedTheme);
+        setIdioma(savedLanguage);
+      } catch (error) {
+        if (!cancelled) {
+          setErrorMessage(
+            error.message || "Não foi possível carregar sua conta."
+          );
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function clearMessages() {
+    setMessage("");
+    setErrorMessage("");
+  }
+
+  async function saveProfile(event) {
+    event.preventDefault();
+    clearMessages();
+
+    if (!user) return;
+
+    if (!nome.trim()) {
+      setErrorMessage("Informe seu nome.");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const { data, error } = await supabase.auth.updateUser({
+        data: {
+          ...user.user_metadata,
+          full_name: nome.trim(),
+          avatar_path: avatarPath || null,
+          // Não gravamos a URL assinada: ela expira.
+          avatar_url: null,
+        },
+      });
+
+      if (error) throw error;
+
+      setUser(data.user);
+      setMessage("Informações do perfil salvas com sucesso.");
+    } catch (error) {
+      setErrorMessage(
+        `Não foi possível salvar: ${error.message}`
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function uploadAvatar(event) {
+    const file = event.target.files?.[0];
+
+    event.target.value = "";
+
+    if (!file || !user) return;
+
+    clearMessages();
+
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      setErrorMessage("Selecione uma imagem JPG, PNG ou WEBP.");
+      return;
+    }
+
+    if (file.size > MAX_AVATAR_SIZE) {
+      setErrorMessage("A imagem deve ter no máximo 2 MB.");
+      return;
+    }
+
+    setUploading(true);
+
+    const filePath = `${user.id}/avatar`;
+
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from(AVATAR_BUCKET)
+        .upload(filePath, file, {
+          upsert: true,
+          contentType: file.type,
+          cacheControl: "3600",
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: signedData, error: signedError } =
+        await supabase.storage
+          .from(AVATAR_BUCKET)
+          .createSignedUrl(filePath, SIGNED_URL_SECONDS);
+
+      if (signedError) throw signedError;
+
+      const { data: updatedData, error: updateError } =
+        await supabase.auth.updateUser({
+          data: {
+            ...user.user_metadata,
+            full_name: nome.trim(),
+            avatar_path: filePath,
+            avatar_url: null,
+          },
+        });
+
+      if (updateError) throw updateError;
+
+      setUser(updatedData.user);
+      setAvatarPath(filePath);
+      setAvatarUrl(signedData.signedUrl);
+      setMessage("Foto de perfil atualizada.");
+    } catch (error) {
+      setErrorMessage(
+        error.message ||
+          "Não foi possível enviar a foto. Verifique o Storage e suas políticas."
+      );
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function removeAvatar() {
+    clearMessages();
+
+    if (!user || saving || uploading) return;
+
+    setSaving(true);
+
+    try {
+      if (avatarPath) {
+        const { error: deleteError } = await supabase.storage
+          .from(AVATAR_BUCKET)
+          .remove([avatarPath]);
+
+        if (deleteError) throw deleteError;
+      }
+
+      const { data, error } = await supabase.auth.updateUser({
+        data: {
+          ...user.user_metadata,
+          full_name: nome.trim(),
+          avatar_path: null,
+          avatar_url: null,
+        },
+      });
+
+      if (error) throw error;
+
+      setUser(data.user);
+      setAvatarPath("");
+      setAvatarUrl("");
+      setMessage("Foto personalizada removida.");
+    } catch (error) {
+      setErrorMessage(
+        `Não foi possível remover a foto: ${error.message}`
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function savePreferences(nextTheme = tema, nextLanguage = idioma) {
+    clearMessages();
+
+    try {
+      localStorage.setItem("atlas-theme", nextTheme);
+      localStorage.setItem("atlas-language", nextLanguage);
+
+      setTema(nextTheme);
+      setIdioma(nextLanguage);
+
+      setMessage("Preferências salvas neste navegador.");
+    } catch {
+      setErrorMessage("Não foi possível salvar as preferências.");
+    }
+  }
+
+  async function resetPassword() {
+    clearMessages();
+
+    if (!user?.email) {
+      setErrorMessage("Não encontramos um e-mail para esta conta.");
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        user.email,
+        {
+          redirectTo: `${window.location.origin}/`,
+        }
+      );
+
+      if (error) throw error;
+
+      setMessage(
+        "Se o serviço estiver configurado, você receberá um e-mail para redefinir sua senha."
+      );
+    } catch (error) {
+      setErrorMessage(
+        `Não foi possível enviar o e-mail: ${error.message}`
+      );
+    }
+  }
+
+  if (loading) {
+    return (
+      <main className="profile-page">
+        <div className="profile-loading">Carregando perfil...</div>
+      </main>
+    );
+  }
+
+  if (!user) {
+    return (
+      <main className="profile-page">
+        <div className="profile-loading">
+          {errorMessage || "Faça login para acessar seu perfil."}
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="profile-page">
+      <div className="profile-heading">
+        <h2>Perfil e Configurações</h2>
+        <p>
+          Gerencie suas informações e preferências do Atlas Finance.
+        </p>
+      </div>
+
+      {message && (
+        <div className="profile-message success" role="status">
+          {message}
+        </div>
+      )}
+
+      {errorMessage && (
+        <div className="profile-message error" role="alert">
+          {errorMessage}
+        </div>
+      )}
+
+      <section className="profile-card avatar-card">
+        <div className="profile-avatar">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="Foto de perfil" />
+          ) : (
+            <div className="profile-avatar-placeholder">
+              <span>💜</span>
+            </div>
+          )}
+        </div>
+
+        <div className="avatar-content">
+          <h3>Foto do perfil</h3>
+          <p>Esta foto será exibida no seu perfil.</p>
+
+          <div className="avatar-actions">
+            <button
+              className="profile-primary-button"
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading || saving}
+            >
+              {uploading ? "Enviando..." : "↑ Alterar foto"}
+            </button>
+
+            <button
+              className="profile-secondary-button"
+              type="button"
+              onClick={removeAvatar}
+              disabled={!avatarPath || saving || uploading}
+            >
+              Remover foto
+            </button>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={uploadAvatar}
+              hidden
+            />
+          </div>
+
+          <p className="profile-help">
+            Formatos aceitos: JPG, PNG ou WEBP. Tamanho máximo: 2 MB.
+          </p>
+        </div>
+      </section>
+
+      <form onSubmit={saveProfile}>
+        <section className="profile-card">
+          <div className="profile-section-heading">
+            <h3>Informações pessoais</h3>
+            <p>Seus dados básicos de identificação.</p>
+          </div>
+
+          <div className="profile-fields">
+            <label className="profile-field">
+              <span>Nome</span>
+              <input
+                type="text"
+                value={nome}
+                onChange={(event) => setNome(event.target.value)}
+                placeholder="Seu nome"
+                maxLength={80}
+                required
+              />
+            </label>
+
+            <label className="profile-field">
+              <span>E-mail</span>
+              <input
+                type="email"
+                value={user.email || ""}
+                readOnly
+                disabled
+              />
+              <small>
+                O e-mail está vinculado à sua conta de autenticação.
+              </small>
+            </label>
+          </div>
+
+          <div className="profile-form-actions">
+            <button
+              className="profile-primary-button"
+              type="submit"
+              disabled={saving || uploading}
+            >
+              {saving ? "Salvando..." : "✓ Salvar alterações"}
+            </button>
+          </div>
+        </section>
+      </form>
+
+      <section className="profile-card">
+        <div className="profile-section-heading">
+          <h3>Preferências</h3>
+          <p>Personalize sua experiência no Atlas Finance.</p>
+        </div>
+
+        <div className="profile-preference">
+          <div>
+            <strong>Tema</strong>
+            <p>Escolha a aparência da aplicação.</p>
+          </div>
+
+          <div className="profile-segmented-control">
+            {[
+              { value: "dark", label: "Escuro" },
+              { value: "light", label: "Claro" },
+              { value: "system", label: "Sistema" },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={tema === option.value ? "active" : ""}
+                aria-pressed={tema === option.value}
+                onClick={() => savePreferences(option.value, idioma)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="profile-preference">
+          <div>
+            <strong>Idioma</strong>
+            <p>Selecione o idioma de sua preferência.</p>
+          </div>
+
+          <select
+            value={idioma}
+            onChange={(event) =>
+              savePreferences(tema, event.target.value)
+            }
+            aria-label="Idioma da aplicação"
+          >
+            <option value="pt-BR">Português (Brasil)</option>
+            <option value="en">English</option>
+            <option value="es">Español</option>
+          </select>
+        </div>
+      </section>
+
+      <section className="profile-card">
+        <div className="profile-section-heading">
+          <h3>Segurança</h3>
+          <p>Gerencie o acesso à sua conta.</p>
+        </div>
+
+        <div className="profile-security-row">
+          <div>
+            <strong>Alterar senha</strong>
+            <p>Receba um e-mail para redefinir sua senha.</p>
+          </div>
+
+          <button
+            className="profile-secondary-button"
+            type="button"
+            onClick={resetPassword}
+          >
+            ↗ Redefinir senha
+          </button>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+export default Profile;
+
+
+
+==================================================
+ARQUIVO: src\styles\cards.css
+==================================================
+.metric-card{
+
+    background:#18181b;
+
+    border:1px solid #27272a;
+
+    border-radius:16px;
+
+    padding:8px 12px;
+
+    cursor:pointer;
+
+    transition:.25s;
+
+}
+
+.metric-card{
+
+    animation:fadeUp .4s ease;
+
+    min-height:72px;
+
+}
+
+@keyframes fadeUp{
+
+from{
+
+opacity:0;
+
+transform:translateY(15px);
+
+}
+
+to{
+
+opacity:1;
+
+transform:translateY(0);
+
+}
+
+}
+    
+    .metric-card:hover{
+    
+    transform:translateY(-3px) scale(1.02);
+    
+    border-color:#3b82f6;
+    
+    box-shadow:
+    
+    0 0 20px rgba(59,130,246,.25);
+    
+    }
+
+    .metric-card h4{
+
+        font-size:11px;
+    
+        margin-bottom:4px;
+    
+        text-transform:uppercase;
+    
+        letter-spacing:.8px;
+    
+        color:#9ca3af;
+    
+    }
+
+.metric-card h2{
+
+    font-size:15px;
+
+    margin:2px 0;
+
+}
+
+    .metric-card small{
+
+        opacity:.65;
+        
+        font-size:11px;
+        
+        }
+
+.metric-card:nth-child(1):hover{
+
+    box-shadow:
+    0 0 18px #22c55e;
+    
+    }
+    
+    .metric-card:nth-child(2):hover{
+    
+    box-shadow:
+    0 0 18px #ef4444;
+    
+    }
+    
+    .metric-card:nth-child(3):hover{
+    
+    box-shadow:
+    0 0 18px #facc15;
+    
+    }
+    
+    .metric-card:nth-child(4):hover{
+    
+    box-shadow:
+    0 0 18px #38bdf8;
+    
+    }
+    
+    .metric-card:nth-child(5):hover{
+    
+    box-shadow:
+    0 0 18px #22c55e;
+    
+    }
+    
+    .metric-card:nth-child(6):hover{
+    
+    box-shadow:
+    0 0 18px orange;
+    
+    }
+
+    ::-webkit-scrollbar{
+
+        width:8px;
+        
+        }
+        
+        ::-webkit-scrollbar-thumb{
+        
+        background:#444;
+        
+        border-radius:20px;
+        
+        }
+
+        /*==================================*/
+/* GLOW DOS CARDS */
+/*==================================*/
+
+.metric-card{
+
+    position:relative;
+
+    overflow:hidden;
+
+}
+
+.metric-card::before{
+
+    content:"";
+
+    position:absolute;
+
+    inset:-35%;
+
+    opacity:.18;
+
+    filter:blur(45px);
+
+    transition:.35s;
+
+    z-index:0;
+
+}
+
+.metric-card>*{
+
+    position:relative;
+
+    z-index:1;
+
+}
+
+.metric-card.entrada::before{
+
+    background:
+
+    radial-gradient(
+
+        circle,
+
+        #22c55e,
+
+        transparent 70%
+
+    );
+
+}
+
+.metric-card.saida::before{
+
+    background:
+
+    radial-gradient(
+
+        circle,
+
+        #ef4444,
+
+        transparent 70%
+
+    );
+
+}
+
+.metric-card.investimento::before{
+
+    background:
+
+    radial-gradient(
+
+        circle,
+
+        #facc15,
+
+        transparent 70%
+
+    );
+
+}
+
+.metric-card.passiva::before{
+
+    background:
+
+    radial-gradient(
+
+        circle,
+
+        #3b82f6,
+
+        transparent 70%
+
+    );
+
+}
+
+.metric-card.economia::before{
+
+    background:
+
+    radial-gradient(
+
+        circle,
+
+        #06b6d4,
+
+        transparent 70%
+
+    );
+
+}
+
+.metric-card.saldo::before{
+
+    background:
+
+    radial-gradient(
+
+        circle,
+
+        #8b5cf6,
+
+        transparent 70%
+
+    );
+
+}
+
+.metric-card.gastos::before{
+
+    background:
+
+    radial-gradient(
+
+        circle,
+
+        #f97316,
+
+        transparent 70%
+
+    );
+
+}
+
+.metric-card:hover::before{
+
+    opacity:.35;
+
+    transform:scale(1.15);
+
+}
+
+.metric-card small{
+
+    display:block;
+
+    margin-top:6px;
+
+    font-size:11px;
+
+    font-weight:600;
+
+}
+
+.metric-card .positive{
+
+    color:#22c55e;
+
+}
+
+.metric-card .negative{
+
+    color:#ef4444;
+
+}
+
+.metric-card .neutral{
+
+    color:#9ca3af;
+
+}
+
+.metric-card.guardado::before {
+    background: radial-gradient(
+        circle,
+        #a78bfa,
+        transparent 70%
+    );
+}
+
+
+==================================================
+ARQUIVO: src\styles\chart.css
+==================================================
+
+
+==================================================
+ARQUIVO: src\styles\dashboard.css
+==================================================
+.dashboard{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:18px;
+
+}
+
+.saldo-card{
+
+    background:#18181b;
+
+    border:1px solid #27272a;
+
+    border-radius:18px;
+
+    padding:25px;
+
+}
+
+.metrics-grid{
+
+    display:grid;
+
+    grid-template-columns:1fr 1fr;
+
+    gap:16px;
+
+}
+
+/* ========================= */
+/* ANIMAÇÕES DASHBOARD */
+/* ========================= */
+
+.metric-card{
+
+    opacity: 0;
+
+    transform: translateY(20px);
+
+    animation: cardAppear .45s ease forwards;
+
+    transition:
+        transform .25s ease,
+        box-shadow .25s ease,
+        border-color .25s ease;
+
+}
+
+.metric-card:hover{
+
+    transform: translateY(-6px);
+
+    border-color: #7c3aed;
+
+    box-shadow:
+        0 12px 28px rgba(0,0,0,.35),
+        0 0 18px rgba(124,58,237,.18);
+
+}
+
+@keyframes cardAppear{
+
+    from{
+
+        opacity:0;
+
+        transform:translateY(20px);
+
+    }
+
+    to{
+
+        opacity:1;
+
+        transform:translateY(0);
+
+    }
+
+}
+
+/* META MENSAL */
+
+.goal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+
+.goal-header h3 {
+    margin: 0;
+}
+
+.goal-add {
+    width: 28px;
+    height: 28px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 0;
+
+    border: 1px solid #3f3f46;
+    border-radius: 8px;
+
+    background: #27272a;
+    color: #fff;
+
+    font-size: 18px;
+    line-height: 1;
+
+    cursor: pointer;
+
+    transition:
+        background .2s ease,
+        border-color .2s ease,
+        transform .2s ease;
+}
+
+.goal-add:hover {
+    background: #7c3aed;
+    border-color: #8b5cf6;
+    transform: scale(1.08);
+}
+
+.goal-dashboard-card {
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 18px;
+    padding: 20px;
+
+    width: 100%;
+    box-sizing: border-box;
+
+    transition:
+        transform .25s ease,
+        box-shadow .25s ease,
+        border-color .25s ease;
+}
+
+.goal-dashboard-card:hover {
+    transform: translateY(-4px);
+
+    border-color: #7c3aed;
+
+    box-shadow:
+        0 10px 24px rgba(0, 0, 0, .30),
+        0 0 16px rgba(124, 58, 237, .15);
+}
+.goal-bar {
+    width: 100%;
+    height: 10px;
+    margin-top: 12px;
+
+    overflow: hidden;
+
+    background: #27272a;
+    border-radius: 999px;
+}
+
+.goal-progress {
+    height: 100%;
+
+    background: #7c3aed;
+
+    border-radius: 999px;
+
+    transition: width .5s ease;
+}
+
+.scheduled-bills-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    max-height: 260px;
+    overflow-y: auto;
+
+    padding-right: 6px;
+}
+
+.scheduled-bill-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+
+    padding: 12px;
+
+    background: #27272a;
+    border: 1px solid #3f3f46;
+    border-radius: 12px;
+
+    transition:
+        border-color .2s ease,
+        transform .2s ease,
+        background .2s ease;
+}
+
+.scheduled-bill-item:hover {
+    transform: translateY(-2px);
+    border-color: #7c3aed;
+    background: #2a2a2e;
+}
+
+.scheduled-bill-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.scheduled-bill-info strong {
+    font-size: 14px;
+}
+
+.scheduled-bill-info span {
+    color: #a1a1aa;
+    font-size: 12px;
+}
+
+.scheduled-bill-info small {
+    color: #a1a1aa;
+    font-size: 11px;
+}
+
+.scheduled-bill-value {
+    white-space: nowrap;
+    font-size: 14px;
+}
+
+.scheduled-bills-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.scheduled-bills-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.scheduled-bills-list::-webkit-scrollbar-thumb {
+    background: #3f3f46;
+    border-radius: 999px;
+}
+
+.scheduled-bills-list::-webkit-scrollbar-thumb:hover {
+    background: #7c3aed;
+}
+
+/* EMPRESTIMO */
+
+.loan-list {
+    max-height: 260px;
+    overflow-y: auto;
+    padding-right: 6px;
+}
+
+.loan-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.loan-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.loan-list::-webkit-scrollbar-thumb {
+    background: #3f3f46;
+    border-radius: 999px;
+}
+
+.loan-list::-webkit-scrollbar-thumb:hover {
+    background: #7c3aed;
+}
+
+/* Cabeçalho da funcionalidade */
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.panel-header h3 {
+    margin: 0;
+}
+
+/* Botões no canto superior direito */
+.loan-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+/* Controle discreto de abrir/fechar */
+.loan-toggle {
+    padding: 4px 7px;
+    min-width: auto;
+    border: 1px solid #333338;
+    border-radius: 6px;
+    background: transparent;
+    color: #a1a1aa;
+    font-size: 10px;
+    line-height: 1.2;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.loan-toggle:hover {
+    background: #27272a;
+    color: #e4e4e7;
+}
+
+
+==================================================
+ARQUIVO: src\styles\filterbar.css
+==================================================
+.filter-bar{
+
+    display:flex;
+
+    gap:12px;
+
+    margin:20px 25px;
+
+    flex-wrap:wrap;
+
+}
+
+.filter-bar button{
+
+    border:none;
+
+    padding:10px 18px;
+
+    border-radius:25px;
+
+    background:#ececec;
+
+    cursor:pointer;
+
+    transition:.25s;
+
+    font-weight:600;
+
+}
+
+.filter-bar button:hover{
+
+    transform:translateY(-2px);
+
+}
+
+.filter-bar .active{
+
+    background:#2563eb;
+
+    color:white;
+
+}
+
+
+==================================================
+ARQUIVO: src\styles\filters.css
+==================================================
+
+
+==================================================
+ARQUIVO: src\styles\header.css
+==================================================
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 18px 32px;
+    gap: 16px;
+  }
+  
+  .header-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+  
+  .header-brand h1 {
+    margin: 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #ffffff;
+  }
+  
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  
+  .profile-button,
+  .logout-button {
+    width: 40px;
+    height: 40px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #7c3aed;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    opacity: 0.85;
+    transition:
+      opacity 0.25s ease,
+      transform 0.25s ease,
+      box-shadow 0.25s ease;
+  }
+  
+  .profile-button:hover,
+  .logout-button:hover {
+    opacity: 1;
+    transform: translateY(-1px);
+    box-shadow: 0 0 12px rgba(124, 58, 237, 0.35);
+  }
+  
+  .profile-button:focus-visible,
+  .logout-button:focus-visible {
+    outline: 2px solid #c4b5fd;
+    outline-offset: 3px;
+  }
+  
+  .logout-button {
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+  
+  @media (max-width: 480px) {
+    .header {
+      padding: 16px;
+      gap: 10px;
+    }
+  
+    .header-brand {
+      gap: 8px;
+    }
+  
+    .header-brand h1 {
+      font-size: 1rem;
+    }
+  
+    .header-actions {
+      gap: 6px;
+    }
+  }
+  
+  
+.header-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+  
+  .header-brand h2 {
+    margin: 0;
+    font-size: 1.2rem;
+  }
+  
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .profile-icon-button {
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .header-avatar {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+  
+  .profile-icon-button:hover {
+    opacity: 1;
+    transform: translateY(-1px);
+    box-shadow: 0 0 12px rgba(124, 58, 237, 0.4);
+  }
+  
+
+
+  .header-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+  
+  .header-brand h2 {
+    margin: 0;
+    font-size: 1.2rem;
+  }
+  
+  
+.header-logo {
+  display: block;
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+  
+.header-avatar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.profile-icon-button {
+  overflow: hidden;
+}
+
+
+
+.accessibility-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.accessibility-button {
+  width: 48px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #6d28d9;
+  border-radius: 12px;
+  background: #1a102b;
+  color: #ffffff;
+  font-size: 30px;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.accessibility-button:hover {
+  background: #4c1d95;
+  transform: translateY(-1px);
+}
+
+.accessibility-button:focus-visible,
+.accessibility-close:focus-visible {
+  outline: 3px solid #c4b5fd;
+  outline-offset: 3px;
+}
+
+.accessibility-panel {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 1000;
+  width: min(320px, calc(100vw - 32px));
+  padding: 20px;
+  border: 1px solid #454052;
+  border-radius: 16px;
+  background: #17151f;
+  color: #ffffff;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+
+.accessibility-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.accessibility-panel-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.accessibility-panel p {
+  color: #c4c0d0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.accessibility-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #ffffff;
+  font-size: 26px;
+  cursor: pointer;
+}
+
+.accessibility-close:hover {
+  background: #373142;
+}
+
+.accessibility-option {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 0;
+  border-bottom: 1px solid #393442;
+}
+
+.accessibility-option span {
+  font-weight: 600;
+}
+
+.accessibility-option small {
+  color: #c4c0d0;
+  line-height: 1.4;
+}
+
+.accessibility-coming-soon {
+  margin-bottom: 0;
+  font-size: 0.8rem !important;
+}
+
+@media (max-width: 480px) {
+  .accessibility-button {
+    width: 40px;
+    height: 40px;
+    font-size: 26px;
+  }
+
+  .accessibility-panel {
+    right: -90px;
+  }
+}
+
+
+
+==================================================
+ARQUIVO: src\styles\home.css
+==================================================
+.home{
+
+    display:grid;
+
+    grid-template-columns:360px 1fr;
+
+    gap:25px;
+
+    padding:25px;
+
+}
+
+.left-panel{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:20px;
+
+}
+
+.right-panel{
+
+    background:#16181d;
+
+    border:1px solid #27272a;
+
+    border-radius:20px;
+
+    padding:20px;
+
+    height: 650px;
+
+}
+
+
+==================================================
+ARQUIVO: src\styles\layout.css
+==================================================
+
+
+==================================================
+ARQUIVO: src\styles\loan.css
+==================================================
+
+
+==================================================
+ARQUIVO: src\styles\login.css
+==================================================
+.login-page{
+
+    width:100vw;
+    height:100vh;
+
+    display:flex;
+
+    justify-content:center;
+    align-items:center;
+
+    background:#090909;
+
+}
+
+.login-card{
+
+    width:380px;
+
+    background:#181818;
+
+    border:1px solid #2b2b2b;
+
+    border-radius:20px;
+
+    padding:40px;
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:18px;
+
+}
+
+.login-card h1{
+
+    color:white;
+
+}
+
+.login-card p{
+
+    color:#888;
+
+}
+
+.login-card input{
+
+    background:#111;
+
+    color:white;
+
+    border:none;
+
+    padding:14px;
+
+    border-radius:12px;
+
+}
+
+.login-card button{
+
+    padding:14px;
+
+    border:none;
+
+    border-radius:12px;
+
+    cursor:pointer;
+
+}
+
+.register{
+
+    background:#242424;
+
+    color:white;
+
+}
+
+.auth-logo{
+
+    display:block;
+
+    margin:0 auto 20px;
+
+    transition:transform .35s ease, filter .35s ease;
+
+}
+
+.auth-logo:hover{
+
+    transform:translateY(-2px) scale(1.03);
+
+    filter:drop-shadow(0 0 18px rgba(139,92,246,.35));
+
+}
+
+
+/* Logo do Atlas como marca d'água nas telas de autenticação */
+.login-page {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+  }
+  
+ 
+.login-page::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    background-image: url("/atlas-logo-full.png");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    opacity: 0.18;
+    pointer-events: none;
+  }
+  
+
+
+==================================================
+ARQUIVO: src\styles\logo.css
+==================================================
+.logo{
+
+    user-select:none;
+
+    pointer-events:none;
+
+    transition:.35s;
+
+    animation:logoAppear .8s ease;
+
+}
+
+.logo:hover{
+
+    transform:scale(1.04);
+
+}
+
+@keyframes logoAppear{
+
+from{
+
+opacity:0;
+
+transform:translateY(-15px);
+
+}
+
+to{
+
+opacity:1;
+
+transform:translateY(0);
+
+}
+
+}
+
+
+==================================================
+ARQUIVO: src\styles\modal.css
+==================================================
+.modal-overlay{
+
+    position: fixed;
+
+    top:0;
+    left:0;
+
+    width:100%;
+    height:100vh;
+
+    background:rgba(0, 0, 0, 0.55);
+
+    backdrop-filter: blur(5px);
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    z-index:9999;
+
+    animation:fadeIn .25s ease;
+
+}
+
+.modal{
+
+    background:#45024e;
+
+    width:700px;
+
+    max-width:95%;
+
+    border-radius:18px;
+
+    padding:30px;
+
+    box-shadow:0 15px 50px rgba(0, 0, 0, 0.25);
+
+    position:relative;
+
+    animation:modalOpen .28s ease;
+
+    text-align: center;
+
+    animation:modalOpen .28s ease;
+
+}
+
+.close-button{
+    position: absolute;
+
+    top: 18px;
+    right: 18px;
+
+    width: 40px;
+    height: 40px;
+
+    border: none;
+    border-radius: 50%;
+
+    background: #1f1f1f;
+    color: #fff;
+
+    font-size: 22px;
+
+    cursor: pointer;
+
+    transition: .25s;
+}
+
+.close-button:hover{
+
+    background:#ff4d4d;
+
+    transform: rotate(180deg) scale(1.08);
+
+}
+
+@keyframes modalOpen{
+
+    from{
+
+        opacity:0;
+
+        transform:scale(.9);
+
+    }
+
+    to{
+
+        opacity:1;
+
+        transform:scale(1);
+
+    }
+
+}
+
+.wizard-type-grid{
+
+    display:grid;
+    
+    grid-template-columns:repeat(2,1fr);
+    
+    gap:20px;
+    
+    margin-top:25px;
+    
+    }
+    
+    .wizard-type-card{
+    
+    background:#ffffff;
+    
+    border:1px solid #333;
+    
+    border-radius:14px;
+    
+    padding:25px;
+    
+    cursor:pointer;
+    
+    transition:.25s;
+    
+    text-align:left;
+    
+    }
+    
+    .wizard-type-card:hover{
+    
+    transform:translateY(-4px);
+    
+    border-color:#3b82f6;
+    
+    box-shadow:0 0 20px rgba(59,130,246,.35);
+    
+    }
+    
+    .wizard-type-card h3{
+    
+    margin-bottom:10px;
+    
+    }
+    
+    .wizard-type-card p{
+    
+    opacity:.8;
+    
+    font-size:.9rem;
+    
+    }
+
+    /* ========================================= */
+/* ANIMAÇÃO DE ENTRADA */
+/* ========================================= */
+
+@keyframes fadeIn{
+
+    from{
+
+        opacity:0;
+
+    }
+
+    to{
+
+        opacity:1;
+
+    }
+
+}
+
+@keyframes modalOpen{
+
+    from{
+
+        opacity:0;
+
+        transform:
+            translateY(20px)
+            scale(.95);
+
+    }
+
+    to{
+
+        opacity:1;
+
+        transform:
+            translateY(0)
+            scale(1);
+
+    }
+
+}
+
+.category-section {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.category-title {
+    width: 220px;
+
+    margin-top: 3px;
+
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+
+    color: #d4d4d8;
+}
+
+.category-select {
+    width: 220px;
+    box-sizing: border-box;
+}
+
+.custom-category-select {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.custom-category-select .category-select {
+    width: 220px;
+}
+
+.category-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.category-actions button {
+    width: 30px;
+    height: 30px;
+
+    padding: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border: 1px solid #3f3f46;
+    border-radius: 6px;
+
+    background: #27272a;
+
+    cursor: pointer;
+}
+
+.category-actions button:hover {
+    background: #7c3aed;
+    border-color: #8b5cf6;
+}
+
+.new-category {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    width: 220px;
+    margin-top: 5px;
+}
+
+.new-category input {
+    width: 145px;
+    height: 32px;
+
+    box-sizing: border-box;
+}
+
+.new-category button {
+    width: 69px;
+    height: 32px;
+
+    padding: 0;
+
+    border-radius: 6px;
+
+    cursor: pointer;
+}
+
+
+==================================================
+ARQUIVO: src\styles\profile.css
+==================================================
+
+.profile-page {
+    width: 100%;
+    max-width: 1500px;
+    margin: 0 auto;
+    padding: 28px;
+    box-sizing: border-box;
+    color: #f4f4f5;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  
+  .profile-heading {
+    margin-bottom: 8px;
+  }
+  
+  .profile-heading h2 {
+    margin: 0 0 8px;
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    font-weight: 750;
+    letter-spacing: -0.04em;
+  }
+  
+  .profile-heading p,
+  .profile-section-heading p,
+  .avatar-content > p,
+  .profile-preference p,
+  .profile-security-row p {
+    color: #a1a1aa;
+    margin: 6px 0 0;
+    line-height: 1.55;
+  }
+  
+  .profile-card {
+    background: linear-gradient(145deg, #181a24, #14151d);
+    border: 1px solid #292c3a;
+    border-radius: 16px;
+    padding: 24px;
+    min-width: 0;
+  }
+  
+  .profile-card h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+  
+  .avatar-card {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+  
+  .profile-avatar {
+    width: 168px;
+    height: 168px;
+    flex: 0 0 168px;
+    border-radius: 50%;
+    border: 2px solid #383047;
+    background: #100b1b;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+  }
+  
+  .profile-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  
+  .profile-avatar-placeholder {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(circle, #35115e, #100b1b 72%);
+  }
+  
+  .profile-avatar-placeholder span {
+    font-size: 4.5rem;
+  }
+  
+  .avatar-content {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .avatar-content h3 {
+    margin-bottom: 6px;
+  }
+  
+  .avatar-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 18px;
+  }
+  
+  .profile-primary-button,
+  .profile-secondary-button {
+    min-height: 42px;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      background 0.2s ease,
+      border-color 0.2s ease,
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+  
+  .profile-primary-button {
+    background: linear-gradient(110deg, #7c3aed, #6d28d9);
+    color: #fff;
+    border: 1px solid #8b5cf6;
+  }
+  
+  .profile-primary-button:hover:not(:disabled) {
+    background: #8b5cf6;
+    box-shadow: 0 0 18px #7c3aed44;
+    transform: translateY(-1px);
+  }
+  
+  .profile-secondary-button {
+    background: #222431;
+    color: #e4e4e7;
+    border: 1px solid #343747;
+  }
+  
+  .profile-secondary-button:hover:not(:disabled) {
+    background: #2b2d3d;
+    border-color: #55516a;
+  }
+  
+  .profile-primary-button:disabled,
+  .profile-secondary-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  
+  .profile-help {
+    font-size: 0.85rem;
+    margin-top: 14px !important;
+  }
+  
+  .profile-section-heading {
+    margin-bottom: 22px;
+  }
+  
+  .profile-section-heading p {
+    margin-top: 5px;
+  }
+  
+  .profile-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 20px;
+  }
+  
+  .profile-field {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    min-width: 0;
+    color: #e4e4e7;
+    font-size: 0.95rem;
+  }
+  
+  .profile-field input,
+  .profile-preference select {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    background: #171923;
+    color: #f4f4f5;
+    border: 1px solid #383b4c;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font: inherit;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  
+  .profile-field input:focus,
+  .profile-preference select:focus {
+    border-color: #8b5cf6;
+    box-shadow: 0 0 0 3px #7c3aed25;
+  }
+  
+  .profile-field input:disabled {
+    color: #a1a1aa;
+    opacity: 0.8;
+    cursor: not-allowed;
+  }
+  
+  .profile-field small {
+    color: #858595;
+    font-size: 0.78rem;
+    line-height: 1.45;
+  }
+  
+  .profile-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 20px;
+  }
+  
+  .profile-preference,
+  .profile-security-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 14px 0;
+  }
+  
+  .profile-preference + .profile-preference {
+    border-top: 1px solid #292c3a;
+  }
+  
+  .profile-preference strong,
+  .profile-security-row strong {
+    font-size: 0.95rem;
+  }
+  
+  .profile-segmented-control {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: #101119;
+    border: 1px solid #292c3a;
+    border-radius: 10px;
+  }
+  
+  .profile-segmented-control button {
+    min-width: 84px;
+    padding: 10px 14px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    color: #d4d4d8;
+    background: transparent;
+    cursor: pointer;
+    transition: 0.2s ease;
+  }
+  
+  .profile-segmented-control button:hover {
+    background: #272033;
+  }
+  
+  .profile-segmented-control button.active {
+    background: #6d28d9;
+    color: #fff;
+    border-color: #8b5cf6;
+  }
+  
+  .profile-preference select {
+    max-width: 300px;
+  }
+  
+  .profile-security-row {
+    padding: 16px;
+    border: 1px solid #292c3a;
+    border-radius: 12px;
+    background: #151620;
+  }
+  
+  .profile-message {
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+  
+  .profile-message.success {
+    background: #10291f;
+    color: #86efac;
+    border: 1px solid #166534;
+  }
+  
+  .profile-message.error {
+    background: #351414;
+    color: #fecaca;
+    border: 1px solid #991b1b;
+  }
+  
+  .profile-loading {
+    padding: 48px 20px;
+    color: #a1a1aa;
+    text-align: center;
+  }
+  
+  @media (max-width: 760px) {
+    .profile-page {
+      padding: 18px;
+      gap: 14px;
+    }
+  
+    .profile-card {
+      padding: 18px;
+    }
+  
+    .avatar-card {
+      align-items: flex-start;
+      gap: 18px;
+    }
+  
+    .profile-avatar {
+      width: 104px;
+      height: 104px;
+      flex-basis: 104px;
+    }
+  
+    .profile-avatar-placeholder span {
+      font-size: 3rem;
+    }
+  
+    .profile-fields {
+      grid-template-columns: 1fr;
+    }
+  
+    .profile-preference,
+    .profile-security-row {
+      align-items: stretch;
+      flex-direction: column;
+      gap: 14px;
+    }
+  
+    .profile-segmented-control {
+      width: 100%;
+      box-sizing: border-box;
+    }
+  
+    .profile-segmented-control button {
+      min-width: 0;
+      flex: 1;
+      padding: 10px 6px;
+    }
+  
+    .profile-preference select {
+      max-width: none;
+    }
+  
+    .profile-form-actions {
+      justify-content: stretch;
+    }
+  
+    .profile-form-actions button {
+      width: 100%;
+    }
+  }
+  
+  @media (max-width: 440px) {
+    .avatar-card {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+  
+    .avatar-content {
+      width: 100%;
+    }
+  
+    .avatar-actions {
+      justify-content: center;
+    }
+  }
+  
+
+
+==================================================
+ARQUIVO: src\styles\register.css
+==================================================
+.register-page{
+
+    min-height:100vh;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    background:#09090b;
+
+    padding:30px;
+
+}
+
+.register-card{
+
+    width:100%;
+
+    max-width:430px;
+
+    background:#18181b;
+
+    border:1px solid #27272a;
+
+    border-radius:18px;
+
+    padding:35px;
+
+    animation:fadeUp .45s ease;
+
+}
+
+.register-card h1{
+
+    font-size:30px;
+
+    margin-bottom:8px;
+
+    color:white;
+
+}
+
+.register-card p{
+
+    color:#9ca3af;
+
+    margin-bottom:28px;
+
+}
+
+.register-card input{
+
+    width:100%;
+
+    margin-bottom:14px;
+
+    padding:13px;
+
+    border-radius:10px;
+
+    border:none;
+
+    outline:none;
+
+    background:#27272a;
+
+    color:white;
+
+    transition:.25s;
+
+}
+
+.register-card input:focus{
+
+    border:1px solid #3b82f6;
+
+    box-shadow:0 0 15px rgba(59,130,246,.25);
+
+}
+
+.register-card button{
+
+    width:100%;
+
+    padding:13px;
+
+    margin-top:10px;
+
+    border:none;
+
+    border-radius:10px;
+
+    cursor:pointer;
+
+    font-weight:600;
+
+    transition:.25s;
+
+}
+
+.register-card button:first-of-type{
+
+    background:#2563eb;
+
+    color:white;
+
+}
+
+.register-card button:first-of-type:hover{
+
+    background:#1d4ed8;
+
+}
+
+.register-card .register-back{
+
+    background:transparent;
+
+    color:#9ca3af;
+
+    border:1px solid #3f3f46;
+
+}
+
+.register-card .register-back:hover{
+
+    background:#27272a;
+
+    color:white;
+
+}
+
+@keyframes fadeUp{
+
+    from{
+
+        opacity:0;
+
+        transform:translateY(20px);
+
+    }
+
+    to{
+
+        opacity:1;
+
+        transform:translateY(0);
+
+    }
+
+}
+
+.auth-logo{
+
+    display:block;
+
+    margin:0 auto 20px;
+
+    transition:transform .35s ease, filter .35s ease;
+
+}
+
+.auth-logo:hover{
+
+    transform:translateY(-2px) scale(1.03);
+
+    filter:drop-shadow(0 0 18px rgba(139,92,246,.35));
+
+}
+
+
+
+
+==================================================
+ARQUIVO: src\styles\theme.css
+==================================================
+:root{
+
+    --bg:#0b0b0b;
+
+    --surface:#171717;
+
+    --surface2:#202020;
+
+    --border:#2a2a2a;
+
+    --text:#ffffff;
+
+    --text2:#b5b5b5;
+
+    --green:#22c55e;
+
+    --red:#ef4444;
+
+    --yellow:#facc15;
+
+    --blue:#38bdf8;
+
+}
+
+
+==================================================
+ARQUIVO: src\styles\transactionItem.css
+==================================================
+.transaction-item {
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 12px;
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    transition:
+        transform .18s ease,
+        box-shadow .18s ease,
+        border-color .18s ease;
+
+    animation: itemAppear .35s ease;
+}
+
+.transaction-item:hover {
+    transform: translateX(6px);
+    border-color: #7c3aed;
+
+    box-shadow:
+        0 10px 24px rgba(0, 0, 0, .25);
+}
+
+
+/* ========================================= */
+/* CONTAINER PRINCIPAL */
+/* ========================================= */
+
+.transactions-container {
+    display: grid;
+
+    grid-template-columns: 1fr 1fr;
+
+    gap: 12px;
+
+    width: 100%;
+
+    align-items: start;
+}
+
+
+/* ========================================= */
+/* LISTA DE TRANSAÇÕES */
+/* ========================================= */
+
+.transactions {
+    width: 100%;
+
+    max-height: 720px;
+
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    padding-right: 8px;
+
+    box-sizing: border-box;
+}
+
+.transactions::-webkit-scrollbar {
+    width: 8px;
+}
+
+.transactions::-webkit-scrollbar-track {
+    background: #141414;
+    border-radius: 20px;
+}
+
+.transactions::-webkit-scrollbar-thumb {
+    background: #353535;
+    border-radius: 20px;
+}
+
+.transactions::-webkit-scrollbar-thumb:hover {
+    background: #5d5d5d;
+}
+
+
+/* ========================================= */
+/* COLUNA DIREITA */
+/* ========================================= */
+
+.side-panel {
+    width: 100%;
+
+    position: sticky;
+    top: 20px;
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 18px;
+
+    box-sizing: border-box;
+}
+
+
+/* ========================================= */
+/* CARD DE TRANSAÇÃO */
+/* ========================================= */
+
+.transaction-card {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+
+/* ========================================= */
+/* PARTE ESQUERDA DA TRANSAÇÃO */
+/* ========================================= */
+
+.transaction-left {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+
+/* ========================================= */
+/* PARTE DIREITA DA TRANSAÇÃO */
+/* ========================================= */
+
+.transaction-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+
+/* ========================================= */
+/* BOLINHA DA TRANSAÇÃO */
+/* ========================================= */
+
+.transaction-dot {
+    width: 14px;
+    height: 14px;
+
+    border-radius: 50%;
+}
+
+
+/* ========================================= */
+/* CARDS LATERAIS */
+/* ========================================= */
+
+.panel-card {
+    width: 100%;
+    box-sizing: border-box;
+
+    background: #18181d;
+
+    border: 1px solid #2a2a2a;
+
+    border-radius: 16px;
+
+    padding: 20px;
+
+    color: white;
+}
+
+
+/* ========================================= */
+/* BOTÕES DA TRANSAÇÃO */
+/* ========================================= */
+
+.transaction-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.transaction-actions button {
+    width: 38px;
+    height: 38px;
+}
+
+
+/* ========================================= */
+/* ANIMAÇÃO DAS TRANSAÇÕES */
+/* ========================================= */
+
+@keyframes itemAppear {
+
+    from {
+        opacity: 0;
+
+        transform:
+            translateX(-25px);
+    }
+
+    to {
+        opacity: 1;
+
+        transform:
+            translateX(0);
+    }
+
+}
+
+
+==================================================
+ARQUIVO: src\styles\transactionList.css
+==================================================

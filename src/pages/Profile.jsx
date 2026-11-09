@@ -84,7 +84,7 @@ function Profile() {
         if (cancelled) return;
 
         setUser(currentUser);
-        setNome(metadata.full_name || metadata.name || "");
+        setNome(metadata.full_name || metadata.nome || metadata.name || "");
         setAvatarPath(savedPath);
         setAvatarUrl(signedUrl);
         setTema(savedTheme);
@@ -130,10 +130,10 @@ function Profile() {
         data: {
           ...user.user_metadata,
           full_name: nome.trim(),
+          nome: nome.trim(),
           avatar_path: avatarPath || null,
-          // Não gravamos a URL assinada: ela expira.
           avatar_url: null,
-        },
+      },
       });
 
       if (error) throw error;

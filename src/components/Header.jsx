@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../services/supabase";
 import "../styles/header.css";
@@ -30,6 +31,7 @@ function Header({ onOpenProfile, onGoHome, currentPage = "home" }) {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [userId, setUserId] = useState("");
   const [accessibilityOpen, setAccessibilityOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const [accessibility, setAccessibility] = useState(
     readAccessibilitySettings
@@ -156,10 +158,62 @@ function Header({ onOpenProfile, onGoHome, currentPage = "home" }) {
     }));
   }
 
-  function logout() {
-    supabase.auth.signOut().then(({ error }) => {
-      if (error) console.error("Erro ao sair:", error);
-    });
+  async function logout() {
+    if (isLoggingOut) return;
+
+    setIsLoggingOut(true);
+
+    try {
+      const { data, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !data.user) {
+        throw new Error(
+          "Não foi possível identificar a conta autenticada."
+        );
+      }
+
+      const user = data.user;
+
+      // Conta de teste: excluir os dados antes de encerrar a sessão.
+      if (user.is_anonymous === true) {
+        const { error: cleanupError } =
+          await supabase.functions.invoke("delete-demo-account");
+
+        if (cleanupError) {
+          console.error(
+            "Erro ao excluir os dados da conta de teste:",
+            cleanupError
+          );
+
+          throw new Error(
+            "Não foi possível excluir os dados da versão de teste. Sua sessão continua ativa. Tente novamente."
+          );
+        }
+      }
+
+      // Conta real: apenas encerra a sessão.
+      // Conta anônima: a identidade já foi excluída no servidor.
+      // scope local limpa a sessão deste navegador.
+      const { error: signOutError } = await supabase.auth.signOut({
+        scope: "local",
+      });
+
+      if (signOutError) {
+        throw signOutError;
+      }
+
+      setAvatarUrl("");
+      setUserId("");
+    } catch (error) {
+      console.error("Erro ao sair:", error);
+
+      window.alert(
+        error.message ||
+          "Não foi possível sair da conta. Tente novamente."
+      );
+    } finally {
+      setIsLoggingOut(false);
+    }
   }
 
   return (
@@ -335,7 +389,11 @@ function Header({ onOpenProfile, onGoHome, currentPage = "home" }) {
           type="button"
           onClick={currentPage === "profile" ? onGoHome : onOpenProfile}
           title={currentPage === "profile" ? "Voltar ao painel" : "Meu perfil"}
-          aria-label={currentPage === "profile" ? "Voltar ao painel" : "Meu perfil"}
+          aria-label={
+            currentPage === "profile"
+              ? "Voltar ao painel"
+              : "Meu perfil"
+          }
         >
           {currentPage === "profile" ? (
             "⌂"
@@ -351,8 +409,13 @@ function Header({ onOpenProfile, onGoHome, currentPage = "home" }) {
           )}
         </button>
 
-        <button className="logout-button" onClick={logout} type="button">
-          Sair
+        <button
+          className="logout-button"
+          onClick={logout}
+          type="button"
+          disabled={isLoggingOut}
+        >
+          {isLoggingOut ? "Saindo..." : "Sair"}
         </button>
       </div>
     </header>
