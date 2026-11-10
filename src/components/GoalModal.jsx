@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 
-function GoalModal({ goal, onSave, onClose }) {
+function GoalModal({ goal, onSave, onClose, initialSavedAmount = 0 }) {
     const [form, setForm] = useState({
         nome: "Investimentos/Guardados",
         valor_meta: "",
@@ -14,7 +14,7 @@ function GoalModal({ goal, onSave, onClose }) {
             setForm({
                 nome: "Investimentos/Guardados",
                 valor_meta: "",
-                valor_inicial: "",
+                valor_inicial: Number(initialSavedAmount || 0).toFixed(2),
                 prazo_meses: "",
             });
             return;
@@ -22,9 +22,9 @@ function GoalModal({ goal, onSave, onClose }) {
 
         setForm({
             nome: goal.nome || "Investimentos/Guardados",
-            valor_meta: goal.valor_meta || "",
-            valor_inicial: goal.valor_inicial || "",
-            prazo_meses: goal.prazo_meses || "",
+            valor_meta: goal.valor_meta ?? "",
+            valor_inicial: goal.valor_inicial ?? "",
+            prazo_meses: goal.prazo_meses ?? "",
         });
     }, [goal]);
 
@@ -56,7 +56,7 @@ function GoalModal({ goal, onSave, onClose }) {
         onSave({
             ...goal,
             ...form,
-            nome: "Investimentos/Guardados",
+            nome: form.nome.trim(),
             valor_meta: Number(form.valor_meta),
             valor_inicial: Number(form.valor_inicial || 0),
             prazo_meses: Number(form.prazo_meses),
@@ -65,7 +65,7 @@ function GoalModal({ goal, onSave, onClose }) {
 
     return (
         <div>
-            <h2>Investimentos/Guardados</h2>
+            <h2>{goal ? "Editar meta" : "Criar meta"}</h2>
 
             <p>
                 Defina quanto deseja acumular e em quanto tempo pretende
@@ -78,10 +78,11 @@ function GoalModal({ goal, onSave, onClose }) {
             <input
                 id="nome-meta"
                 name="nome"
-                placeholder="Investimentos/Guardados"
+                type="text"
+                placeholder="Ex.: Reserva de Emergência"
                 value={form.nome}
                 onChange={handleChange}
-                readOnly
+                required
             />
 
             <label htmlFor="valor-meta">

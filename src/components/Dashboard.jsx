@@ -48,8 +48,7 @@ function Dashboard({
     const insights = getDashboardInsights(transactions);
 
     
-    /* ALTERAÇÃO: soma todo o dinheiro já utilizado */
-    
+    // Total utilizado do dinheiro guardado
 const totalJaUtilizado =
 Number(valorGuardadoUtilizadoBase || 0) +
 allTransactions
@@ -63,36 +62,47 @@ allTransactions
         0
     );
 
-
-    /* ALTERAÇÃO: calcula os investimentos usando o histórico completo */
-    const totalInvestimentosGuardados =
-        Number(investimentosBase || 0) +
-        allTransactions
-            .filter((item) => item.tipo === "investimento")
-            .reduce(
-                (total, item) => total + Number(item.valor || 0),
-                0
-            );
-
-    /* ALTERAÇÃO: o dinheiro guardado inclui os investimentos
-       e desconta os valores que já foram utilizados */
-    const valorGuardado = Math.max(
-        0,
-        Number(goal?.valor_inicial || 0) +
-            totalInvestimentosGuardados -
-            totalJaUtilizado
+// Total de investimentos registrados
+const totalInvestimentosGuardados =
+Number(investimentosBase || 0) +
+allTransactions
+    .filter((item) => item.tipo === "investimento")
+    .reduce(
+        (total, item) => total + Number(item.valor || 0),
+        0
     );
 
-    /* ALTERAÇÃO: o progresso da meta usa o mesmo cálculo */
-    const valorAtualMeta = valorGuardado;
+// CARD INDEPENDENTE:
+// Não utiliza valor_inicial nem qualquer informação da meta.
+const valorGuardado = Math.max(
+0,
+totalInvestimentosGuardados - totalJaUtilizado
+);
 
-    const percentualMeta =
-        goal && Number(goal.valor_meta) > 0
-            ? Math.min(
-                (valorAtualMeta / Number(goal.valor_meta)) * 100,
-                100
-            )
-            : 0;
+// META INDEPENDENTE:
+// Considera o valor inicial e os snapshots registrados na criação.
+const valorAtualMeta = goal
+? Math.max(
+    0,
+    Number(goal.valor_inicial || 0) +
+        (
+            totalInvestimentosGuardados -
+            Number(goal.investimentos_snapshot || 0)
+        ) -
+        (
+            totalJaUtilizado -
+            Number(goal.utilizado_snapshot || 0)
+        )
+)
+: 0;
+
+const percentualMeta =
+goal && Number(goal.valor_meta) > 0
+    ? Math.min(
+        (valorAtualMeta / Number(goal.valor_meta)) * 100,
+        100
+    )
+    : 0;
 
 
     const formatarMoeda = (valor) =>

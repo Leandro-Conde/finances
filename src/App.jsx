@@ -15,6 +15,7 @@ import {
   getGoal,
   createGoal,
   updateGoal,
+  deleteGoal,
 } from "./services/goalService";
 
 import {
@@ -91,13 +92,13 @@ function App() {
   const [showScheduledBills, setShowScheduledBills] = useState(true);
   const [showTransactions, setShowTransactions] = useState(true);
 
-  const [limiteGastos, setLimiteGastos] = useState(3000); 
+  const [limiteGastos, setLimiteGastos] = useState(3000);
   const [valorGuardadoUtilizadoBase, setValorGuardadoUtilizadoBase] = useState(0);
 
   const [preservedChartHistory, setPreservedChartHistory] = useState([]);
 
 
-  
+
   async function loadTransactions(userId = user?.id) {
     if (!userId || currentUserIdRef.current !== userId) {
         return false;
@@ -249,96 +250,105 @@ async function loadScheduledBills(userId = user?.id) {
     setLoanModalOpen(false);
   }
 
-  
 
- 
-async function handleUseSavedMoney(valor) {
-  if (!user) {
-    throw new Error("Você precisa estar autenticado.");
-  }
 
-  if (!goal) {
-    throw new Error("Cadastre uma meta antes de usar o valor guardado.");
-  }
 
-  const valorUtilizado = Number(valor);
 
-  if (!Number.isFinite(valorUtilizado) || valorUtilizado <= 0) {
-    throw new Error("Informe um valor válido.");
-  }
+  async function handleUseSavedMoney(valor) {
+    if (!user) {
+      throw new Error("Você precisa estar autenticado.");
+    }
 
-  
-/* ALTERAÇÃO: calcular o total já utilizado */
+    if (!goal) {
+      throw new Error("Cadastre uma meta antes de usar o valor guardado.");
+    }
 
-const totalJaUtilizado =
-  Number(valorGuardadoUtilizadoBase || 0) +
-  transactions
-    .filter(
-      (item) =>
-        item.tipo === "saida" &&
-        item.descricao === "Valor guardado usado"
-    )
-    .reduce(
-      (total, item) => total + Number(item.valor || 0),
-      0
+    const valorUtilizado = Number(valor);
+
+    if (!Number.isFinite(valorUtilizado) || valorUtilizado <= 0) {
+      throw new Error("Informe um valor válido.");
+    }
+
+    // Calcula o total de investimentos, incluindo o saldo preservado.
+    const totalInvestimentos =
+      Number(investimentosBase || 0) +
+      transactions
+        .filter((item) => item.tipo === "investimento")
+        .reduce(
+          (total, item) => total + Number(item.valor || 0),
+          0
+        );
+
+    // Calcula o total já utilizado, incluindo o saldo preservado.
+    const totalValorGuardadoUtilizado =
+      Number(valorGuardadoUtilizadoBase || 0) +
+      transactions
+        .filter(
+          (item) =>
+            item.tipo === "saida" &&
+            item.descricao === "Valor guardado usado"
+        )
+        .reduce(
+          (total, item) => total + Number(item.valor || 0),
+          0
+        );
+
+    // Considera o saldo inicial e as movimentações posteriores aos snapshots.
+    const valorDisponivel = Math.max(
+      0,
+      Number(goal.valor_inicial || 0) +
+        (
+          totalInvestimentos -
+          Number(goal.investimentos_snapshot || 0)
+        ) -
+        (
+          totalValorGuardadoUtilizado -
+          Number(goal.utilizado_snapshot || 0)
+        )
     );
 
+    // Impede utilizar mais dinheiro do que está disponível.
+    if (valorUtilizado > valorDisponivel + 0.001) {
+      throw new Error(
+        "O valor informado ultrapassa o dinheiro guardado disponível."
+      );
+    }
 
-/* ALTERAÇÃO: considerar o saldo inicial de investimentos
-   e os investimentos registrados no histórico */
-const totalInvestimentosGuardados =
-  Number(investimentosBase || 0) +
-  transactions
-    .filter((item) => item.tipo === "investimento")
-    .reduce(
-      (total, item) => total + Number(item.valor || 0),
-      0
-    );
+    // Utiliza a data local para evitar problemas de fuso horário.
+    const hoje = new Date();
 
-/* ALTERAÇÃO: usar a mesma regra de cálculo do Dashboard */
-const valorDisponivel = Math.max(
-  0,
-  Number(goal.valor_inicial || 0) +
-    totalInvestimentosGuardados -
-    totalJaUtilizado
-);
+    const dataLocal = [
+      hoje.getFullYear(),
+      String(hoje.getMonth() + 1).padStart(2, "0"),
+      String(hoje.getDate()).padStart(2, "0"),
+    ].join("-");
 
-/* ALTERAÇÃO: validar contra o saldo realmente disponível */
-if (valorUtilizado > valorDisponivel + 0.001) {
-  throw new Error(
-    "O valor informado ultrapassa o dinheiro guardado disponível."
-  );
-}
+    // Registra a utilização no Supabase.
+    const { error } = await supabase
+      .from("transactions")
+      .insert({
+        user_id: user.id,
+        tipo: "saida",
+        categoria: "Valor guardado",
+        descricao: "Valor guardado usado",
+        valor: valorUtilizado,
+        data: dataLocal,
+        observacao: "Utilização de dinheiro guardado.",
+      });
 
+    if (error) {
+      console.error("Erro ao utilizar valor guardado:", error);
+      throw new Error(
+        "Não foi possível registrar a utilização no Supabase."
+      );
+    }
 
-  const hoje = new Date();
-  const dataLocal = [
-    hoje.getFullYear(),
-    String(hoje.getMonth() + 1).padStart(2, "0"),
-    String(hoje.getDate()).padStart(2, "0"),
-  ].join("-");
-
-  const { error } = await supabase
-    .from("transactions")
-    .insert({
-      user_id: user.id,
-      tipo: "saida",
-      categoria: "Valor guardado",
-      descricao: "Valor guardado usado",
-      valor: valorUtilizado,
-      data: dataLocal,
-      observacao: "Utilização de dinheiro guardado.",
-    });
-
-  if (error) {
-    console.error("Erro ao utilizar valor guardado:", error);
-    throw new Error("Não foi possível registrar a utilização no Supabase.");
+    // Atualiza os dados financeiros após a operação.
+    await loadTransactions();
   }
 
-  await loadTransactions();
-}
 
-  
+
 const currentUserIdRef = useRef(null);
 currentUserIdRef.current = user?.id ?? null;
 
@@ -348,14 +358,14 @@ currentUserIdRef.current = user?.id ?? null;
       setCleanupCount(null);
       return;
     }
-  
+
     let cancelled = false;
-  
+
     async function updateCleanupCount() {
       setCountingCleanup(true);
       setCleanupCount(null);
       setCleanupCountError("");
-  
+
       try {
         const count = await countTransactionsToClean(
           user.id,
@@ -363,13 +373,13 @@ currentUserIdRef.current = user?.id ?? null;
             ? "todos"
             : Number(cleanupPeriod)
         );
-  
+
         if (!cancelled) {
           setCleanupCount(count);
         }
       } catch (error) {
         console.error("Erro ao contar transações:", error);
-  
+
         if (!cancelled) {
           setCleanupCountError(
             "Não foi possível calcular a quantidade. Tente novamente."
@@ -381,9 +391,9 @@ currentUserIdRef.current = user?.id ?? null;
         }
       }
     }
-  
+
     updateCleanupCount();
-  
+
     return () => {
       cancelled = true;
     };
@@ -450,53 +460,89 @@ currentUserIdRef.current = user?.id ?? null;
     }
   }
 
- 
-async function saveGoal(goalData) {
-  if (!user) {
-    throw new Error("Usuário não autenticado.");
+
+
+  async function saveGoal(goalData) {
+    if (!user) {
+      throw new Error("Usuário não autenticado.");
+    }
+
+    const dadosMeta = {
+      nome: String(goalData.nome || "").trim(),
+      valor_meta: Number(goalData.valor_meta),
+      valor_inicial: Number(goalData.valor_inicial || 0),
+      prazo_meses: Number(goalData.prazo_meses),
+    };
+
+    if (!dadosMeta.nome) {
+      throw new Error("Informe um nome para a meta.");
+    }
+
+    if (
+      !Number.isFinite(dadosMeta.valor_meta) ||
+      dadosMeta.valor_meta <= 0
+    ) {
+      throw new Error("O valor-alvo precisa ser maior que zero.");
+    }
+
+    if (
+      !Number.isFinite(dadosMeta.valor_inicial) ||
+      dadosMeta.valor_inicial < 0
+    ) {
+      throw new Error("O valor inicial não pode ser negativo.");
+    }
+
+    if (
+      !Number.isInteger(dadosMeta.prazo_meses) ||
+      dadosMeta.prazo_meses <= 0
+    ) {
+      throw new Error("O prazo precisa ser um número inteiro de meses.");
+    }
+
+    if (goalData.id) {
+      // Edição: preserva os snapshots originais.
+      await updateGoal(goalData.id, dadosMeta);
+    } else {
+      // Criação: registra o saldo existente como ponto de partida.
+      await createGoal({
+        ...dadosMeta,
+        user_id: user.id,
+        investimentos_snapshot: totalInvestimentos,
+        utilizado_snapshot: totalValorGuardadoUtilizado,
+      });
+    }
+
+    await loadGoal();
+
+    setGoalModalOpen(false);
+    setEditingGoal(null);
   }
 
-  const dadosMeta = {
-    nome: "Investimentos/Guardados",
-    valor_meta: Number(goalData.valor_meta),
-    valor_inicial: Number(goalData.valor_inicial || 0),
-    prazo_meses: Number(goalData.prazo_meses),
-  };
 
-  if (
-    !Number.isFinite(dadosMeta.valor_meta) ||
-    dadosMeta.valor_meta <= 0
-  ) {
-    throw new Error("O valor-alvo precisa ser maior que zero.");
+async function removeGoal() {
+  if (!user || !goal?.id) {
+    window.alert("Nenhuma meta encontrada para excluir.");
+    return;
   }
 
-  if (
-    !Number.isFinite(dadosMeta.valor_inicial) ||
-    dadosMeta.valor_inicial < 0
-  ) {
-    throw new Error("O valor inicial não pode ser negativo.");
+  const confirmar = window.confirm(
+    "Deseja realmente excluir a meta de Investimentos/Guardados? Os investimentos e as transações financeiras serão preservados."
+  );
+
+  if (!confirmar) return;
+
+  try {
+    await deleteGoal(goal.id);
+    await loadGoal();
+
+    setEditingGoal(null);
+    setGoalModalOpen(false);
+
+    window.alert("Meta excluída com sucesso!");
+  } catch (error) {
+    console.error("Erro ao excluir meta:", error);
+    window.alert("Não foi possível excluir a meta. Tente novamente.");
   }
-
-  if (
-    !Number.isInteger(dadosMeta.prazo_meses) ||
-    dadosMeta.prazo_meses <= 0
-  ) {
-    throw new Error("O prazo precisa ser um número inteiro de meses.");
-  }
-
-  if (goalData.id) {
-    await updateGoal(goalData.id, dadosMeta);
-  } else {
-    await createGoal({
-      ...dadosMeta,
-      user_id: user.id,
-    });
-  }
-
-  await loadGoal();
-
-  setGoalModalOpen(false);
-  setEditingGoal(null);
 }
 
 
@@ -665,19 +711,19 @@ useEffect(() => {
     }
   }
 
-  
+
 
   async function handleCleanTransactionHistory(months = null) {
     if (!user) {
       window.alert("Você precisa estar autenticado.");
       return;
     }
-  
+
     if (cleaningHistory || !financialDataLoaded) {
       window.alert("Aguarde o carregamento dos dados financeiros.");
       return;
     }
-  
+
     if (
       months !== null &&
       (!Number.isInteger(months) || months < 1)
@@ -685,51 +731,51 @@ useEffect(() => {
       window.alert("Selecione um período válido.");
       return;
     }
-  
+
     const confirmation =
       months === null
         ? "Todo o histórico será apagado. O saldo e os investimentos acumulados serão preservados. Deseja continuar?"
         : `Serão apagadas as transações anteriores ao limite de ${months} mês(es). O saldo e os investimentos acumulados serão preservados. Deseja continuar?`;
-  
+
     if (!window.confirm(confirmation)) return;
-  
+
     setCleaningHistory(true);
-  
+
     try {
       const result = await cleanTransactionHistory(months);
 
       console.log("Resultado da limpeza:", result);
-  
+
       // A exclusão já ocorreu no banco. Agora atualizamos a tela.
       const transactionsReloaded = await loadTransactions();
-  
+
       await loadGoal();
-  
+
       if (!transactionsReloaded) {
         window.alert(
           `A limpeza foi executada: ${result?.deleted_count ?? 0} transação(ões) removida(s). Porém, não foi possível atualizar os dados na tela. Recarregue o aplicativo.`
         );
         return result;
       }
-  
+
       window.alert(
         `Limpeza concluída! ${result?.deleted_count ?? 0} transação(ões) removida(s).`
       );
-  
+
       return result;
     } catch (error) {
       console.error("Erro ao limpar histórico:", error);
-  
+
       window.alert(
         "Não foi possível confirmar a limpeza. Confira os dados no Supabase antes de tentar novamente."
       );
-  
+
       return null;
     } finally {
       setCleaningHistory(false);
     }
   }
-  
+
 
 
   function editTransaction(transaction) {
@@ -778,7 +824,7 @@ useEffect(() => {
     );
 
 
-    
+
     const totalValorGuardadoUtilizado =
     Number(valorGuardadoUtilizadoBase || 0) +
     transactions
@@ -792,16 +838,24 @@ useEffect(() => {
         0
       );
 
-  
-  const valorAtualMeta = goal
-    ? Math.max(
-        0,
-        Number(goal.valor_inicial || 0) +
-          totalInvestimentos -
-          totalValorGuardadoUtilizado
+
+
+const valorAtualMeta = goal
+? Math.max(
+    0,
+    Number(goal.valor_inicial || 0) +
+      (
+        totalInvestimentos -
+        Number(goal.investimentos_snapshot || 0)
+      ) -
+      (
+        totalValorGuardadoUtilizado -
+        Number(goal.utilizado_snapshot || 0)
       )
-    : 0;
-  
+  )
+: 0;
+
+
   const percentualMeta =
     goal && Number(goal.valor_meta) > 0
       ? Math.min(
@@ -809,9 +863,9 @@ useEffect(() => {
           100
         )
       : 0;
-  
+
   /* ALTERAÇÃO: removida a segunda declaração duplicada de percentualMeta */
-  
+
   return (
     <>
       {/* CABEÇALHO: permanece visível nas duas telas */}
@@ -820,7 +874,7 @@ useEffect(() => {
         onOpenProfile={() => setCurrentPage("profile")}
         onGoHome={() => setCurrentPage("home")}
       />
-  
+
       <a className="skip-to-content" href="#main-content">Pular para o conteúdo</a>
 
       <main id="main-content" className="app-main" tabIndex="-1">
@@ -876,7 +930,12 @@ useEffect(() => {
             }}
           >
             <GoalModal
+              key={`${goalModalOpen ? "open" : "closed"}-${editingGoal?.id || "new"}`}
               goal={editingGoal}
+              initialSavedAmount={Math.max(
+                0,
+                totalInvestimentos - totalValorGuardadoUtilizado
+              )}
               onClose={() => {
                 setGoalModalOpen(false);
                 setEditingGoal(null);
@@ -1112,8 +1171,56 @@ useEffect(() => {
 
               {/* Meta Mensal */}
               <div className="panel-card">
-              <div className="goal-header">
-              <h3> Investimentos/Guardados </h3>
+              <div
+                className="goal-header"
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 12,
+                  flexWrap: "wrap",
+                }}
+              >
+                <h3>Investimentos/Guardados</h3>
+
+                <div style={{ display: "flex", gap: 8 }}>
+                  {!goal && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingGoal(null);
+                        setGoalModalOpen(true);
+                      }}
+                      style={{
+                        padding: "8px 14px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: "#7c3aed",
+                        color: "#fff",
+                        cursor: "pointer",
+                      }}
+                    >
+                      + Criar
+                    </button>
+                  )}
+
+                  {goal && (
+                    <button
+                      type="button"
+                      onClick={removeGoal}
+                      style={{
+                        padding: "8px 14px",
+                        borderRadius: 8,
+                        border: "1px solid #ef4444",
+                        background: "transparent",
+                        color: "#ef4444",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Excluir
+                    </button>
+                  )}
+                </div>
               </div>
 
                 {goal ? (
