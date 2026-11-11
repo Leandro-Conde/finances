@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { supabase } from "../../services/supabase";
 import Register from "./Register";
-import Logo from "../common/Logo";
 
 import "../../styles/login.css";
 
@@ -65,7 +64,7 @@ function Login() {
 
     return (
         <div className="login-page">
-            <Logo variant="atlas" size={110} />
+           
 
             <div className="login-card">
                 <h1>Atlas Finance</h1>
